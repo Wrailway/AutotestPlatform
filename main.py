@@ -1,5 +1,9 @@
+import logging
 import sys
-import importlib  # 必须导入这个模块
+import os
+import importlib
+from venv import logger  # 必须导入这个模块
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QAction, QMenu
 )
@@ -7,6 +11,10 @@ from PyQt5.QtCore import (
     Qt, QPropertyAnimation, QEasingCurve  # 动画相关依赖
 )
 from PyQt5 import uic
+
+# 初始化logger（如果没定义的话）
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.ERROR)
 
 class AutoTestMain(QMainWindow):
     def __init__(self):
@@ -55,10 +63,10 @@ class AutoTestMain(QMainWindow):
         company_info = """
         🚀 自动化测试平台 v1.0.0
         ==============================
-        版权所有 © 2026 某某科技有限公司
-        技术支持：010-12345678
-        邮箱：support@company.com
-        官网：www.company.com
+        版权所有 © 2015-2025 上海傲意信息科技有限公司
+        技术支持：021-63210200
+        邮箱： info@oymotion.com
+        官网：https://www.oymotion.com/
         
         本软件仅限公司内部使用，未经授权禁止传播
         """
@@ -81,6 +89,23 @@ class AutoTestMain(QMainWindow):
         )
         # 禁用最大化
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+        
+        try:
+            # 从文件路径加载图标（修复核心错误：self.window → self）
+            current_dir = os.getcwd()
+            config_file_name = "icon/logo.png"
+            config_file_path = os.path.join(current_dir, config_file_name)
+            
+            # 检查文件是否存在（增加容错）
+            if os.path.exists(config_file_path):
+                icon = QIcon(config_file_path)
+                self.setWindowIcon(icon)  # 正确写法：self 直接调用setWindowIcon
+            else:
+                raise FileNotFoundError(f"图标文件不存在：{config_file_path}")
+        except Exception as e:
+            logger.error(f"加载窗口图标失败：{str(e)}")
+            # 可选：弹窗提示（如果需要）
+            # QMessageBox.warning(self, "提示", f"加载窗口图标失败：{str(e)}")
 
     def _open_module(self, module_name):
         self.statusBar().showMessage(f"🚀 正在启动 {module_name} 模块...", 2000)
