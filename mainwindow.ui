@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>AutoTest Pro | 智能自动化测试平台</string>
+  </property>
+  <!-- 全局样式：通过控件路径精准匹配，避免同名冲突 -->
+  <property name="styleSheet">
+   <string notr="true">
+    /* 全局基础 */
+    QMainWindow { background-color: #FFFFFF; }
+    QWidget { font-family: &quot;Microsoft YaHei&quot;; }
+
+    /* 主标题 */
+    QLabel#title_label {
+     font-size: 48px;
+     font-weight: 700;
+     color: #212529;
+     margin-bottom: 60px;
+     text-align: center;
+    }
+
+    /* 四个按钮统一样式（尺寸/背景） */
+    QPushButton#btn_app, QPushButton#btn_robot, QPushButton#btn_ai, QPushButton#btn_server {
+     background-color: #F8F9FA;
+     border: 2px solid #DEE2E6;
+     border-radius: 8px;
+     min-height: 220px;
+     min-width: 320px;
+     padding: 20px;
+    }
+    QPushButton#btn_app:hover, QPushButton#btn_robot:hover, QPushButton#btn_ai:hover, QPushButton#btn_server:hover {
+     background-color: #007BFF;
+     color: #FFFFFF;
+     border-color: #007BFF;
+    }
+
+    /* 每个入口的图标（唯一命名+精准匹配） */
+    QLabel#icon_app, QLabel#icon_robot, QLabel#icon_ai, QLabel#icon_server {
+     font-size: 90px !important;
+     color: #007BFF;
+     margin-bottom: 15px;
+     text-align: center;
+    }
+
+    /* 每个入口的标题（唯一命名+精准匹配） */
+    QLabel#title_app, QLabel#title_robot, QLabel#title_ai, QLabel#title_server {
+     font-size: 24px !important;
+     font-weight: 600;
+     color: #212529;
+     margin-bottom: 15px;
+     text-align: center;
+    }
+
+    /* 每个入口的描述（唯一命名+精准匹配） */
+    QLabel#desc_app, QLabel#desc_robot, QLabel#desc_ai, QLabel#desc_server {
+     font-size: 16px !important;
+     color: #6C757D;
+     text-align: center;
+    }
+   </string>
+  </property>
+
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="main_layout">
+    <property name="leftMargin"><number>80</number></property>
+    <property name="topMargin"><number>60</number></property>
+    <property name="rightMargin"><number>80</number></property>
+    <property name="bottomMargin"><number>40</number></property>
+
+    <!-- 主标题 -->
+    <item>
+     <widget class="QLabel" name="title_label">
+      <property name="text"><string>智能自动化测试平台</string></property>
+      <property name="alignment"><set>Qt::AlignCenter</set></property>
+     </widget>
+    </item>
+
+    <!-- 四个功能入口 -->
+    <item>
+     <layout class="QGridLayout" name="func_grid">
+      <property name="spacing"><number>40</number></property>
+
+      <!-- 1. 应用程序测试（基准） -->
+      <item row="0" column="0">
+       <widget class="QPushButton" name="btn_app">
+        <layout class="QVBoxLayout" name="vbox_app">
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+         <item>
+          <widget class="QLabel" name="icon_app">
+           <property name="text"><string>📱</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="title_app">
+           <property name="text"><string>应用程序测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="desc_app">
+           <property name="text"><string>桌面应用自动化测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+
+      <!-- 2. 灵巧手测试（和基准结构完全一致） -->
+      <item row="0" column="1">
+       <widget class="QPushButton" name="btn_robot">
+        <layout class="QVBoxLayout" name="vbox_robot">
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+         <item>
+          <widget class="QLabel" name="icon_robot">
+           <property name="text"><string>🤖</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="title_robot">
+           <property name="text"><string>灵巧手测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="desc_robot">
+           <property name="text"><string>灵巧手精准控制测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+
+      <!-- 3. AI模型测试（和基准结构完全一致） -->
+      <item row="1" column="0">
+       <widget class="QPushButton" name="btn_ai">
+        <layout class="QVBoxLayout" name="vbox_ai">
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+         <item>
+          <widget class="QLabel" name="icon_ai">
+           <property name="text"><string>🧠</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="title_ai">
+           <property name="text"><string>AI模型测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="desc_ai">
+           <property name="text"><string>AI推理结果有效性验证</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+
+      <!-- 4. 服务器测试（和基准结构完全一致） -->
+      <item row="1" column="1">
+       <widget class="QPushButton" name="btn_server">
+        <layout class="QVBoxLayout" name="vbox_server">
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+         <item>
+          <widget class="QLabel" name="icon_server">
+           <property name="text"><string>🖥️</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="title_server">
+           <property name="text"><string>服务器测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="desc_server">
+           <property name="text"><string>服务器请求与稳定性测试</string></property>
+           <property name="alignment"><set>Qt::AlignCenter</set></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+
+  <widget class="QMenuBar" name="menubar"/>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
