@@ -2,7 +2,6 @@ import logging
 import sys
 import os
 import importlib
-from venv import logger  # 必须导入这个模块
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QAction, QMenu
