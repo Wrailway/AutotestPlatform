@@ -183,7 +183,7 @@ class RobotHandTestWindow(QMainWindow):
                 border-bottom: 1px solid #E2E8F0;
                 padding: 6px;
                 font-weight: bold;
-                color: #47569;
+                color: #475698;
                 font-size: 12px;
             }
             QTextEdit {

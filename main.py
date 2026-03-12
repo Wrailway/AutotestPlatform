@@ -13,7 +13,7 @@ import os
 import importlib
 from typing import Dict, Optional
 
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QAction, QMenu, QWidget
 )
@@ -233,16 +233,43 @@ class AutoTestMainWindow(QMainWindow):
         """显示关于信息弹窗"""
         QMessageBox.about(self, DLG_TITLE_ABOUT, ABOUT_CONTENT)
 
+
+
+    # 先定义动画参数（建议放文件顶部，方便调整）
+    BUTTON_ANIM_DURATION = 150  # 动画时长（毫秒），越短越灵敏
+    BUTTON_ANIM_SCALE = 0.95    # 缩放比例（0.95=缩小到95%）
+    BUTTON_ANIM_CURVE = QEasingCurve.OutBounce  # 回弹曲线，更丝滑
+
     def _play_button_anim(self, btn: QWidget) -> None:
-        """播放按钮点击动画"""
+        """播放按钮点击动画（整体缩放版）"""
+        # 记录原始尺寸
+        orig_width = btn.width()
         orig_height = btn.height()
-        anim = QPropertyAnimation(btn, b"minimumHeight")
-        anim.setDuration(BUTTON_ANIM_DURATION)
-        anim.setStartValue(orig_height)
-        anim.setEndValue(int(orig_height * BUTTON_ANIM_SCALE))
-        anim.setEasingCurve(BUTTON_ANIM_CURVE)
-        anim.finished.connect(lambda: btn.setMinimumHeight(orig_height))
-        anim.start()
+        
+        # 创建宽度动画
+        anim_width = QPropertyAnimation(btn, b"minimumWidth")
+        anim_width.setDuration(BUTTON_ANIM_DURATION)
+        anim_width.setStartValue(orig_width)
+        anim_width.setEndValue(int(orig_width * BUTTON_ANIM_SCALE))
+        anim_width.setEasingCurve(BUTTON_ANIM_CURVE)
+        
+        # 创建高度动画
+        anim_height = QPropertyAnimation(btn, b"minimumHeight")
+        anim_height.setDuration(BUTTON_ANIM_DURATION)
+        anim_height.setStartValue(orig_height)
+        anim_height.setEndValue(int(orig_height * BUTTON_ANIM_SCALE))
+        anim_height.setEasingCurve(BUTTON_ANIM_CURVE)
+        
+        # 动画结束后恢复原始尺寸
+        def reset_size():
+            btn.setMinimumWidth(orig_width)
+            btn.setMinimumHeight(orig_height)
+        
+        anim_height.finished.connect(reset_size)
+        
+        # 同时启动两个动画
+        anim_width.start()
+        anim_height.start()
 
     def _open_module(self, module_name: str) -> None:
         """
