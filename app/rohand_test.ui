@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="main_window">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1349</width>
+    <height>960</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>自动化测试平台</string>
+  </property>
+  <!-- 商业化配色样式表（高级灰+商务蓝） -->
+  <property name="styleSheet">
+   <string notr="true">
+/* 主窗口背景：高级浅灰 */
+QMainWindow {
+    background-color: #f9fafb;
+}
+
+/* 分组框：商务风格+圆角 */
+QGroupBox {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    border: 2px solid #e5e7eb;
+    border-top-color: #f3f4f6;
+    border-left-color: #f3f4f6;
+    border-radius: 8px;
+    margin-top: 12px;
+    background-color: #ffffff;
+    padding-top: 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 10px;
+    color: #1e40af;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+/* 主按钮：商务蓝渐变+3D效果 */
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #2563eb, stop:1 #1e40af);
+    color: white;
+    border: 3px solid;
+    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #3b82f6, stop:1 #2563eb);
+    border-color: #60a5fa #2563eb #2563eb #60a5fa;
+}
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #1e40af, stop:1 #1e3a8a);
+    border-color: #1e40af #3b82f6 #3b82f6 #1e40af;
+    padding-left: 8px;
+    padding-top: 8px;
+}
+
+/* 日志功能小按钮：轻量化样式 */
+QPushButton#log_copy_btn, QPushButton#log_clear_btn, QPushButton#log_save_btn {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #f3f4f6, stop:1 #e5e7eb);
+    color: #1f2937;
+    border-color: #d1d5db #9ca3af #9ca3af #d1d5db;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+QPushButton#log_copy_btn:hover, QPushButton#log_clear_btn:hover, QPushButton#log_save_btn:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #e5e7eb, stop:1 #d1d5db);
+}
+
+/* 标签：商务灰文字 */
+QLabel {
+    font-size: 13px;
+    color: #374151;
+}
+
+/* 下拉框：商务风格 */
+QComboBox {
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 6px;
+    padding: 4px 8px;
+    background-color: white;
+    min-height: 25px;
+}
+QComboBox::drop-down {
+    border: none;
+}
+QComboBox::down-arrow {
+    width: 12px;
+    height: 12px;
+}
+QComboBox QAbstractItemView {
+    border: 3px solid #2563eb;
+    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+    border-radius: 6px;
+    background-color: white;
+    selection-background-color: #dbeafe;
+    selection-color: #1e40af;
+}
+
+/* 复选框：商务风格 */
+QCheckBox {
+    font-size: 13px;
+    color: #374151;
+}
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 4px;
+    background-color: white;
+}
+QCheckBox::indicator:checked {
+    background-color: #2563eb;
+}
+QCheckBox::indicator:hover {
+    border-color: #d1d5db #9ca3af #9ca3af #d1d5db;
+}
+
+/* 表格：商务风格 */
+QTableWidget {
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 6px;
+    background-color: white;
+    gridline-color: #e5e7eb;
+}
+QTableWidget::item {
+    padding: 6px;
+}
+QTableWidget::item:selected {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+QHeaderView::section {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #f3f4f6, stop:1 #e5e7eb);
+    border: none;
+    border-bottom: 2px solid #d1d5db;
+    padding: 8px;
+    font-weight: 600;
+    color: #1e40af;
+    border-radius: 4px;
+}
+
+/* 日志文本框：商务风格 */
+QTextEdit#log_text_edit {
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 6px;
+    background-color: #ffffff;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 12px;
+    color: #1f2937;
+}
+
+/* 进度条：商务蓝 */
+QProgressBar {
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 6px;
+    text-align: center;
+    background-color: #f3f4f6;
+}
+QProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                              stop:0 #2563eb, stop:1 #1e40af);
+    border-radius: 4px;
+    border: 1px solid #1e40af;
+}
+
+/* 菜单栏：商务风格 */
+QMenuBar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #f3f4f6, stop:1 #e5e7eb);
+    border-bottom: 3px solid #d1d5db;
+    font-size: 13px;
+}
+QMenuBar::item {
+    padding: 6px 15px;
+    margin: 2px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+}
+QMenuBar::item:selected {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #2563eb, stop:1 #1e40af);
+    color: white;
+    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+}
+
+/* 菜单：商务风格 */
+QMenu {
+    background-color: white;
+    border: 3px solid;
+    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
+    border-radius: 6px;
+    padding: 4px;
+}
+QMenu::item {
+    padding: 6px 25px;
+    border-radius: 6px;
+    font-size: 13px;
+    border: 2px solid transparent;
+}
+QMenu::item:selected {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                              stop:0 #2563eb, stop:1 #1e40af);
+    color: white;
+    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+}
+QMenu::separator {
+    height: 2px;
+    background-color: #e5e7eb;
+    margin: 4px 8px;
+}
+   </string>
+  </property>
+  <widget class="QWidget" name="central_widget">
+   <!-- 测试数据分组框 -->
+   <widget class="QGroupBox" name="test_data_group">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>711</width>
+      <height>621</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>测试数据</string>
+    </property>
+   </widget>
+   <!-- 动态日志输出分组框 -->
+   <widget class="QGroupBox" name="log_output_group">
+    <property name="geometry">
+     <rect>
+      <x>750</x>
+      <y>20</y>
+      <width>291</width>
+      <height>621</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>动态日志输出</string>
+    </property>
+    <!-- 日志功能按钮组 -->
+    <widget class="QWidget" name="log_btn_widget" native="true">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>271</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="log_btn_layout">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <!-- <property name="contentsMargins">
+       <set>0 0 0 0</set>
+      </property> -->
+      <item>
+       <widget class="QPushButton" name="log_copy_btn">
+        <property name="text">
+         <string>拷贝日志</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="log_clear_btn">
+        <property name="text">
+         <string>清屏</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="log_save_btn">
+        <property name="text">
+         <string>保存日志</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <!-- 日志显示文本框 -->
+    <widget class="QTextEdit" name="log_text_edit">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>70</y>
+       <width>271</width>
+       <height>540</height>
+      </rect>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="placeholderText">
+      <string>日志输出区域...</string>
+     </property>
+    </widget>
+   </widget>
+   <!-- 功能选项分组框 -->
+   <widget class="QGroupBox" name="function_option_group">
+    <property name="geometry">
+     <rect>
+      <x>1070</x>
+      <y>20</y>
+      <width>251</width>
+      <height>621</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>功能选项</string>
+    </property>
+    <!-- 老化时间 -->
+    <widget class="QLabel" name="aging_time_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>50</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>老化时间</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="aging_time_combo">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>50</y>
+       <width>83</width>
+       <height>25</height>
+      </rect>
+     </property>
+    </widget>
+    <!-- 端口列表 -->
+    <widget class="QLabel" name="port_list_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>130</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>端口列表</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="port_list_combo">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>130</y>
+       <width>83</width>
+       <height>25</height>
+      </rect>
+     </property>
+    </widget>
+    <!-- 刷新按钮 -->
+    <widget class="QPushButton" name="refresh_btn">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>200</y>
+       <width>93</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>刷新</string>
+     </property>
+    </widget>
+    <!-- 全选复选框 -->
+    <widget class="QCheckBox" name="select_all_check">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>200</y>
+       <width>98</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>全选</string>
+     </property>
+    </widget>
+   </widget>
+   <!-- 测试结果分组框 -->
+   <widget class="QGroupBox" name="test_result_group">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>700</y>
+      <width>831</width>
+      <height>171</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>测试结果</string>
+    </property>
+    <widget class="QLabel" name="total_case_label">
+     <property name="geometry">
+      <rect>
+       <x>50</x>
+       <y>40</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>全部用例</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="success_case_label">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>40</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>成功用例</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="fail_case_label">
+     <property name="geometry">
+      <rect>
+       <x>260</x>
+       <y>40</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>失败用例</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="skip_case_label">
+     <property name="geometry">
+      <rect>
+       <x>350</x>
+       <y>40</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>跳过用例</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="total_case_value">
+     <property name="geometry">
+      <rect>
+       <x>50</x>
+       <y>70</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>100条</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="success_case_value">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>70</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>90条</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="fail_case_value">
+     <property name="geometry">
+      <rect>
+       <x>270</x>
+       <y>70</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>8条</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="skip_case_value">
+     <property name="geometry">
+      <rect>
+       <x>350</x>
+       <y>70</y>
+       <width>69</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>2条</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="test_status_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>110</y>
+       <width>781</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>等待测试。。。。</string>
+     </property>
+    </widget>
+   </widget>
+   <!-- 执行控制分组框 -->
+   <widget class="QGroupBox" name="execute_control_group">
+    <property name="geometry">
+     <rect>
+      <x>880</x>
+      <y>700</y>
+      <width>441</width>
+      <height>161</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>执行控制</string>
+    </property>
+    <widget class="QPushButton" name="start_test_btn">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>70</y>
+       <width>101</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>开始测试</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="stop_test_btn">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>70</y>
+       <width>101</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>停止测试</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pause_test_btn">
+     <property name="geometry">
+      <rect>
+       <x>260</x>
+       <y>70</y>
+       <width>101</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>暂停测试</string>
+     </property>
+    </widget>
+   </widget>
+   <!-- 进度条 -->
+   <widget class="QProgressBar" name="test_progress_bar">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>660</y>
+      <width>1281</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="value">
+     <number>24</number>
+    </property>
+   </widget>
+  </widget>
+  <!-- 菜单栏 -->
+  <widget class="QMenuBar" name="menu_bar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1349</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <!-- 动作定义 -->
+   <action name="load_script_action">
+    <property name="text">
+     <string>加载脚本(&amp;L)</string>
+    </property>
+   </action>
+   <action name="export_report_action">
+    <property name="text">
+     <string>输出报告(&amp;E)</string>
+    </property>
+   </action>
+   <action name="exit_action">
+    <property name="text">
+     <string>退出(&amp;X)</string>
+    </property>
+   </action>
+   <action name="about_action">
+    <property name="text">
+     <string>关于(&amp;A)</string>
+    </property>
+   </action>
+   <!-- 文件菜单 -->
+   <widget class="QMenu" name="file_menu">
+    <property name="title">
+     <string>文件(&amp;F)</string>
+    </property>
+    <addaction name="load_script_action"/>
+    <addaction name="export_report_action"/>
+    <separator/>
+    <addaction name="exit_action"/>
+   </widget>
+   <!-- 配置文件菜单 -->
+   <widget class="QMenu" name="config_menu">
+    <property name="title">
+     <string>配置文件(&amp;C)</string>
+    </property>
+   </widget>
+   <!-- 主题菜单 -->
+   <widget class="QMenu" name="theme_menu">
+    <property name="title">
+     <string>主题(&amp;T)</string>
+    </property>
+   </widget>
+   <!-- 帮助菜单 -->
+   <widget class="QMenu" name="help_menu">
+    <property name="title">
+     <string>帮助(&amp;H)</string>
+    </property>
+    <addaction name="about_action"/>
+   </widget>
+   <!-- 添加菜单到菜单栏 -->
+   <addaction name="file_menu"/>
+   <addaction name="config_menu"/>
+   <addaction name="theme_menu"/>
+   <addaction name="help_menu"/>
+  </widget>
+  <widget class="QStatusBar" name="status_bar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
