@@ -284,6 +284,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # 统一跨平台样式
     window = AutoTestWindow()
-    window.setWindowTitle("自动化测试平台 - 商务版")
+    window.setWindowTitle("灵巧手自动化测试界面")
     window.show()
     sys.exit(app.exec_())
