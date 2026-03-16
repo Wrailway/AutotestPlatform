@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import (
     Qt, QPropertyAnimation, QEasingCurve, pyqtSlot
 )
-from PyQt5 import uic
+from PyQt5 import uic, QtGui
 
 # ==============================
 # 常量配置
@@ -293,6 +293,13 @@ def main() -> int:
     
     app = QApplication(sys.argv)
     app.setApplicationName(APP_TITLE)
+    """设置窗口图标"""
+    # 1. 获取当前所在的绝对路径目录
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 2. 拼接出 icon 文件夹下的 logo.png 绝对路径
+    icon_path = os.path.join(base_dir, "icon", "logo.png")
+    # 3. 设置为全局应用图标 (主窗口和未来弹出的子窗口都会生效)
+    app.setWindowIcon(QtGui.QIcon(icon_path))
     
     main_window = AutoTestMainWindow()
     main_window.show()
