@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1349</width>
-    <height>960</height>
+    <width>1516</width>
+    <height>943</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -21,14 +21,12 @@
   </property>
   <property name="styleSheet">
    <string notr="true">
-/* 主窗口背景：高级浅灰 */
-QMainWindow {
-    background-color: #f9fafb;
-}
+/* 主窗口基础样式 */
+QMainWindow {background-color: #f9fafb;}
 
-/* 分组框：商务风格+圆角 */
+/* 分组框样式（保持原有） */
 QGroupBox {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     color: #1f2937;
     border: 2px solid #e5e7eb;
@@ -43,198 +41,199 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 10px;
     padding: 0 10px;
-    color: #1e40af;
-    font-size: 15px;
+    color: #2563eb;
+    font-size: 17px;
     font-weight: 700;
 }
 
-/* 主按钮：商务蓝渐变+3D效果 */
+/* 按钮样式（保持原有） */
 QPushButton {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #2563eb, stop:1 #1e40af);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4d9eff,stop:1 #3b82f6);
     color: white;
     border: 3px solid;
-    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff;
     border-radius: 6px;
     padding: 6px 12px;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 500;
 }
 QPushButton:hover {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #3b82f6, stop:1 #2563eb);
-    border-color: #60a5fa #2563eb #2563eb #60a5fa;
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #73b6ff,stop:1 #4d9eff);
+    border-color: #99ccff #4d9eff #4d9eff #99ccff;
 }
 QPushButton:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #1e40af, stop:1 #1e3a8a);
-    border-color: #1e40af #3b82f6 #3b82f6 #1e40af;
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #2563eb,stop:1 #1e40af);
+    border-color: #2563eb #4d9eff #4d9eff #2563eb;
     padding-left: 8px;
     padding-top: 8px;
 }
-
-/* 日志功能小按钮：轻量化样式 */
-QPushButton#log_copy_btn, QPushButton#log_clear_btn, QPushButton#log_save_btn {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #f3f4f6, stop:1 #e5e7eb);
-    color: #1f2937;
-    border-color: #d1d5db #9ca3af #9ca3af #d1d5db;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-}
-QPushButton#log_copy_btn:hover, QPushButton#log_clear_btn:hover, QPushButton#log_save_btn:hover {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #e5e7eb, stop:1 #d1d5db);
+QPushButton#start_test_btn, QPushButton#pause_test_btn, QPushButton#stop_test_btn {
+    font-size: 20px;
+    font-weight: 600;
 }
 
-/* 标签：商务灰文字 */
+/* 标签样式（保持原有） */
 QLabel {
-    font-size: 13px;
+    font-size: 15px;
     color: #374151;
 }
+QLabel#total_case_label, QLabel#total_case_value {color: #4b5563; font-weight: 600;}
+QLabel#success_case_label, QLabel#success_case_value {color: #10b981; font-weight: 600;}
+QLabel#fail_case_label, QLabel#fail_case_value {color: #ef4444; font-weight: 600;}
+QLabel#skip_case_label, QLabel#skip_case_value {color: #f59e0b; font-weight: 600;}
 
-/* 下拉框：商务风格 */
+/* 下拉框样式（保持原有） */
 QComboBox {
     border: 3px solid;
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 6px;
     padding: 4px 8px;
     background-color: white;
-    min-height: 25px;
+    min-height: 28px;
+    font-size: 15px;
 }
-QComboBox::drop-down {
-    border: none;
-}
-QComboBox::down-arrow {
-    width: 12px;
-    height: 12px;
-}
+QComboBox::drop-down {border: none;}
+QComboBox::down-arrow {width: 14px; height: 14px;}
 QComboBox QAbstractItemView {
-    border: 3px solid #2563eb;
-    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+    border: 3px solid #3b82f6;
+    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff;
     border-radius: 6px;
     background-color: white;
-    selection-background-color: #dbeafe;
-    selection-color: #1e40af;
+    selection-background-color: #e6f2ff;
+    selection-color: #2563eb;
+    font-size: 15px;
 }
 
-/* 复选框：商务风格 */
+/* 复选框样式（保持原有） */
 QCheckBox {
-    font-size: 13px;
+    font-size: 15px;
     color: #374151;
 }
 QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border: 3px solid;
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 4px;
     background-color: white;
 }
-QCheckBox::indicator:checked {
-    background-color: #2563eb;
-}
+QCheckBox::indicator:checked {background-color: #3b82f6;}
 QCheckBox::indicator:hover {
     border-color: #d1d5db #9ca3af #9ca3af #d1d5db;
 }
 
-/* 表格：商务风格 */
+/* 表格样式（保持原有） */
 QTableWidget {
     border: 3px solid;
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 6px;
     background-color: white;
     gridline-color: #e5e7eb;
+    font-size: 15px;
+    stretch: 1;
 }
-QTableWidget::item {
-    padding: 6px;
-}
+QTableWidget::item {padding: 20px;}
 QTableWidget::item:selected {
-    background-color: #dbeafe;
-    color: #1e40af;
+    background-color: #e6f2ff;
+    color: #2563eb;
 }
 QHeaderView::section {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #f3f4f6, stop:1 #e5e7eb);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #f3f4f6,stop:1 #e5e7eb);
     border: none;
     border-bottom: 2px solid #d1d5db;
     padding: 8px;
     font-weight: 600;
-    color: #1e40af;
+    color: #2563eb;
     border-radius: 4px;
+    font-size: 15px;
 }
 
-/* 日志文本框：商务风格 */
+/* 日志框样式（保持原有） */
 QTextEdit#log_text_edit {
     border: 3px solid;
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 6px;
     background-color: #ffffff;
-    font-family: &quot;Consolas&quot;, &quot;Monaco&quot;, monospace;
-    font-size: 12px;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 14px;
     color: #1f2937;
 }
 
-/* 进度条：商务蓝 */
+/* 进度条样式（保持原有） */
 QProgressBar {
     border: 3px solid;
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 6px;
     text-align: center;
     background-color: #f3f4f6;
+    font-size: 15px;
+    color: #ffffff;
+    font-weight: 600;
 }
 QProgressBar::chunk {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                              stop:0 #2563eb, stop:1 #1e40af);
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #4d9eff,stop:1 #3b82f6);
     border-radius: 4px;
-    border: 1px solid #1e40af;
+    border: 1px solid #3b82f6;
 }
 
-/* 菜单栏：商务风格 */
+/* ========== 重点优化：菜单栏样式 ========== */
+/* 主菜单栏样式（与整体浅灰底色统一） */
 QMenuBar {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #f3f4f6, stop:1 #e5e7eb);
-    border-bottom: 3px solid #d1d5db;
-    font-size: 13px;
+    background-color: #f9fafb; /* 匹配主窗口底色 */
+    border-bottom: 2px solid #e5e7eb; /* 轻量化分割线 */
+    font-size: 15px;
+    font-weight: 500;
+    color: #1f2937; /* 文字颜色匹配分组框 */
 }
+
+/* 主菜单项默认状态 */
 QMenuBar::item {
-    padding: 6px 15px;
+    padding: 8px 18px;
     margin: 2px;
     border-radius: 6px;
+    color: #1f2937;
+    background-color: transparent;
     border: 2px solid transparent;
-}
-QMenuBar::item:selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #2563eb, stop:1 #1e40af);
-    color: white;
-    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
 }
 
-/* 菜单：商务风格 */
-QMenu {
-    background-color: white;
-    border: 3px solid;
-    border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
-    border-radius: 6px;
-    padding: 4px;
+/* 主菜单项悬停/选中状态（匹配按钮渐变风格） */
+QMenuBar::item:selected {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4d9eff,stop:1 #3b82f6);
+    color: white; /* 白色文字提高对比度 */
+    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff; /* 匹配按钮边框 */
 }
+
+/* 子菜单容器样式（统一圆角+边框） */
+QMenu {
+    background-color: #ffffff; /* 白色背景匹配分组框 */
+    border: 2px solid #e5e7eb; /* 轻量化边框 */
+    border-radius: 8px; /* 匹配分组框圆角 */
+    padding: 8px 0; /* 优化内边距 */
+    font-size: 15px;
+    color: #1f2937;
+}
+
+/* 子菜单项样式 */
 QMenu::item {
-    padding: 6px 25px;
+    padding: 8px 28px;
+    margin: 0 4px; /* 优化外边距 */
     border-radius: 6px;
-    font-size: 13px;
+    color: #1f2937;
     border: 2px solid transparent;
 }
+
+/* 子菜单项悬停状态（匹配按钮风格） */
 QMenu::item:selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                              stop:0 #2563eb, stop:1 #1e40af);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4d9eff,stop:1 #3b82f6);
     color: white;
-    border-color: #3b82f6 #1e40af #1e40af #3b82f6;
+    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff;
 }
+
+/* 子菜单分隔线（轻量化） */
 QMenu::separator {
     height: 2px;
-    background-color: #e5e7eb;
-    margin: 4px 8px;
+    background-color: #e5e7eb; /* 匹配边框颜色 */
+    margin: 6px 10px;
 }
    </string>
   </property>
@@ -243,9 +242,9 @@ QMenu::separator {
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>20</y>
-      <width>711</width>
-      <height>621</height>
+      <y>40</y>
+      <width>821</width>
+      <height>631</height>
      </rect>
     </property>
     <property name="title">
@@ -255,60 +254,21 @@ QMenu::separator {
    <widget class="QGroupBox" name="log_output_group">
     <property name="geometry">
      <rect>
-      <x>750</x>
-      <y>20</y>
-      <width>291</width>
-      <height>621</height>
+      <x>860</x>
+      <y>40</y>
+      <width>341</width>
+      <height>631</height>
      </rect>
     </property>
     <property name="title">
      <string>动态日志输出</string>
     </property>
-    <widget class="QPushButton" name="log_copy_btn">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>30</y>
-       <width>80</width>
-       <height>30</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>拷贝日志</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="log_clear_btn">
-     <property name="geometry">
-      <rect>
-       <x>95</x>
-       <y>30</y>
-       <width>80</width>
-       <height>30</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>清屏</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="log_save_btn">
-     <property name="geometry">
-      <rect>
-       <x>180</x>
-       <y>30</y>
-       <width>100</width>
-       <height>30</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>保存日志</string>
-     </property>
-    </widget>
     <widget class="QTextEdit" name="log_text_edit">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>70</y>
-       <width>271</width>
+       <y>30</y>
+       <width>321</width>
        <height>540</height>
       </rect>
      </property>
@@ -319,14 +279,53 @@ QMenu::separator {
       <string>日志输出区域...</string>
      </property>
     </widget>
+    <widget class="QPushButton" name="log_copy_btn">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>590</y>
+       <width>90</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>拷贝日志</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="log_clear_btn">
+     <property name="geometry">
+      <rect>
+       <x>114</x>
+       <y>590</y>
+       <width>90</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>清屏</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="log_save_btn">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>590</y>
+       <width>90</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>保存日志</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QGroupBox" name="function_option_group">
     <property name="geometry">
      <rect>
-      <x>1070</x>
-      <y>20</y>
-      <width>251</width>
-      <height>621</height>
+      <x>1230</x>
+      <y>40</y>
+      <width>261</width>
+      <height>631</height>
      </rect>
     </property>
     <property name="title">
@@ -336,7 +335,7 @@ QMenu::separator {
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>50</y>
+       <y>60</y>
        <width>69</width>
        <height>19</height>
       </rect>
@@ -350,8 +349,8 @@ QMenu::separator {
       <rect>
        <x>85</x>
        <y>45</y>
-       <width>150</width>
-       <height>39</height>
+       <width>161</width>
+       <height>42</height>
       </rect>
      </property>
     </widget>
@@ -359,7 +358,7 @@ QMenu::separator {
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>130</y>
+       <y>140</y>
        <width>69</width>
        <height>19</height>
       </rect>
@@ -373,18 +372,18 @@ QMenu::separator {
       <rect>
        <x>85</x>
        <y>125</y>
-       <width>150</width>
-       <height>39</height>
+       <width>161</width>
+       <height>42</height>
       </rect>
      </property>
     </widget>
     <widget class="QPushButton" name="refresh_btn">
      <property name="geometry">
       <rect>
-       <x>110</x>
-       <y>200</y>
+       <x>10</x>
+       <y>230</y>
        <width>93</width>
-       <height>28</height>
+       <height>32</height>
       </rect>
      </property>
      <property name="text">
@@ -394,10 +393,10 @@ QMenu::separator {
     <widget class="QCheckBox" name="select_all_check">
      <property name="geometry">
       <rect>
-       <x>20</x>
-       <y>200</y>
+       <x>140</x>
+       <y>230</y>
        <width>98</width>
-       <height>23</height>
+       <height>32</height>
       </rect>
      </property>
      <property name="text">
@@ -405,12 +404,25 @@ QMenu::separator {
      </property>
     </widget>
    </widget>
+   <widget class="QProgressBar" name="test_progress_bar">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>670</y>
+      <width>1471</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="value">
+     <number>0</number>
+    </property>
+   </widget>
    <widget class="QGroupBox" name="test_result_group">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>700</y>
-      <width>841</width>
+      <width>911</width>
       <height>171</height>
      </rect>
     </property>
@@ -446,7 +458,7 @@ QMenu::separator {
     <widget class="QLabel" name="success_case_label">
      <property name="geometry">
       <rect>
-       <x>200</x>
+       <x>250</x>
        <y>40</y>
        <width>69</width>
        <height>19</height>
@@ -459,7 +471,7 @@ QMenu::separator {
     <widget class="QLabel" name="success_case_value">
      <property name="geometry">
       <rect>
-       <x>200</x>
+       <x>250</x>
        <y>70</y>
        <width>69</width>
        <height>19</height>
@@ -472,7 +484,7 @@ QMenu::separator {
     <widget class="QLabel" name="fail_case_label">
      <property name="geometry">
       <rect>
-       <x>350</x>
+       <x>440</x>
        <y>40</y>
        <width>69</width>
        <height>19</height>
@@ -485,7 +497,7 @@ QMenu::separator {
     <widget class="QLabel" name="fail_case_value">
      <property name="geometry">
       <rect>
-       <x>350</x>
+       <x>440</x>
        <y>70</y>
        <width>69</width>
        <height>19</height>
@@ -498,7 +510,7 @@ QMenu::separator {
     <widget class="QLabel" name="skip_case_label">
      <property name="geometry">
       <rect>
-       <x>500</x>
+       <x>630</x>
        <y>40</y>
        <width>69</width>
        <height>19</height>
@@ -511,7 +523,7 @@ QMenu::separator {
     <widget class="QLabel" name="skip_case_value">
      <property name="geometry">
       <rect>
-       <x>500</x>
+       <x>630</x>
        <y>70</y>
        <width>69</width>
        <height>19</height>
@@ -538,9 +550,9 @@ QMenu::separator {
    <widget class="QGroupBox" name="execute_control_group">
     <property name="geometry">
      <rect>
-      <x>880</x>
+      <x>960</x>
       <y>700</y>
-      <width>441</width>
+      <width>531</width>
       <height>171</height>
      </rect>
     </property>
@@ -550,10 +562,10 @@ QMenu::separator {
     <widget class="QPushButton" name="start_test_btn">
      <property name="geometry">
       <rect>
-       <x>20</x>
-       <y>70</y>
-       <width>111</width>
-       <height>51</height>
+       <x>30</x>
+       <y>60</y>
+       <width>141</width>
+       <height>71</height>
       </rect>
      </property>
      <property name="text">
@@ -563,10 +575,10 @@ QMenu::separator {
     <widget class="QPushButton" name="pause_test_btn">
      <property name="geometry">
       <rect>
-       <x>160</x>
-       <y>70</y>
-       <width>111</width>
-       <height>51</height>
+       <x>210</x>
+       <y>60</y>
+       <width>131</width>
+       <height>71</height>
       </rect>
      </property>
      <property name="text">
@@ -576,10 +588,10 @@ QMenu::separator {
     <widget class="QPushButton" name="stop_test_btn">
      <property name="geometry">
       <rect>
-       <x>300</x>
-       <y>70</y>
-       <width>111</width>
-       <height>51</height>
+       <x>380</x>
+       <y>60</y>
+       <width>121</width>
+       <height>71</height>
       </rect>
      </property>
      <property name="text">
@@ -587,94 +599,52 @@ QMenu::separator {
      </property>
     </widget>
    </widget>
-   <widget class="QProgressBar" name="test_progress_bar">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>670</y>
-      <width>1301</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="value">
-     <number>0</number>
-    </property>
-   </widget>
   </widget>
   <widget class="QMenuBar" name="menu_bar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1349</width>
-     <height>37</height>
+     <width>1516</width>
+     <height>44</height>
     </rect>
+   </property>
+   <property name="nativeMenuBar">
+    <bool>false</bool>
    </property>
    <widget class="QMenu" name="menu_file">
     <property name="title">
      <string>文件</string>
     </property>
-    <action name="action_load_script">
-     <property name="text">
-      <string>加载脚本(&amp;L)</string>
-     </property>
-    </action>
-    <action name="action_export_report">
-     <property name="text">
-      <string>导出报告(&amp;E)</string>
-     </property>
-    </action>
-    <action name="action_exit">
-     <property name="text">
-      <string>退出(&amp;X)</string>
-     </property>
-    </action>
+    <addaction name="action_loadScript"/>
     <addaction name="separator"/>
+    <addaction name="action_exportReport"/>
+    <addaction name="separator"/>
+    <addaction name="action_exit"/>
    </widget>
    <widget class="QMenu" name="menu_config">
     <property name="title">
      <string>配置</string>
     </property>
-    <action name="action_config_port">
-     <property name="text">
-      <string>端口配置(&amp;P)</string>
-     </property>
-    </action>
-    <action name="action_config_time">
-     <property name="text">
-      <string>时间配置(&amp;T)</string>
-     </property>
-    </action>
+    <addaction name="action_viewConfigFile"/>
+    <addaction name="separator"/>
+    <addaction name="action_editConfigFile"/>
    </widget>
    <widget class="QMenu" name="menu_theme">
     <property name="title">
      <string>主题</string>
     </property>
-    <action name="action_theme_default">
-     <property name="text">
-      <string>默认主题(&amp;D)</string>
-     </property>
-    </action>
-    <action name="action_theme_dark">
-     <property name="text">
-      <string>深色主题(&amp;K)</string>
-     </property>
-    </action>
+    <addaction name="action_blackTheme"/>
+    <addaction name="separator"/>
+    <addaction name="action_greenTheme"/>
+    <addaction name="separator"/>
+    <addaction name="action_defaultTheme"/>
    </widget>
    <widget class="QMenu" name="menu_help">
     <property name="title">
      <string>帮助</string>
     </property>
-    <action name="action_about">
-     <property name="text">
-      <string>关于(&amp;A)</string>
-     </property>
-    </action>
-    <action name="action_help_doc">
-     <property name="text">
-      <string>帮助文档(&amp;H)</string>
-     </property>
-    </action>
+    <addaction name="action_about"/>
    </widget>
    <addaction name="menu_file"/>
    <addaction name="menu_config"/>
@@ -682,6 +652,51 @@ QMenu::separator {
    <addaction name="menu_help"/>
   </widget>
   <widget class="QStatusBar" name="status_bar"/>
+  <action name="action_loadScript">
+   <property name="text">
+    <string>加载脚本</string>
+   </property>
+  </action>
+  <action name="action_exportReport">
+   <property name="text">
+    <string>输出报告</string>
+   </property>
+  </action>
+  <action name="action_exit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="action_viewConfigFile">
+   <property name="text">
+    <string>查看配置文件</string>
+   </property>
+  </action>
+  <action name="action_editConfigFile">
+   <property name="text">
+    <string>修改配置文件</string>
+   </property>
+  </action>
+  <action name="action_blackTheme">
+   <property name="text">
+    <string>黑色主题</string>
+   </property>
+  </action>
+  <action name="action_greenTheme">
+   <property name="text">
+    <string>绿色主题</string>
+   </property>
+  </action>
+  <action name="action_defaultTheme">
+   <property name="text">
+    <string>默认主题</string>
+   </property>
+  </action>
+  <action name="action_about">
+   <property name="text">
+    <string>关于</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
