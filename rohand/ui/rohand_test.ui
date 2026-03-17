@@ -104,10 +104,13 @@ QComboBox QAbstractItemView {
     font-size: 15px;
 }
 
-/* 复选框样式（保持原有） */
+/* 复选框样式（优化：匹配整体风格+解决贴边） */
 QCheckBox {
     font-size: 15px;
     color: #374151;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
 }
 QCheckBox::indicator {
     width: 20px;
@@ -116,10 +119,20 @@ QCheckBox::indicator {
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 4px;
     background-color: white;
+    margin-right: 8px;
 }
 QCheckBox::indicator:checked {background-color: #3b82f6;}
 QCheckBox::indicator:hover {
     border-color: #d1d5db #9ca3af #9ca3af #d1d5db;
+}
+/* 端口列表复选框特殊样式 */
+QCheckBox#port_checkbox {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+}
+QCheckBox#port_checkbox:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
 }
 
 /* 表格样式（保持原有） */
@@ -154,7 +167,7 @@ QTextEdit#log_text_edit {
     border-color: #f3f4f6 #d1d5db #d1d5db #f3f4f6;
     border-radius: 6px;
     background-color: #ffffff;
-    font-family: "Consolas", "Monaco", monospace;
+    font-family: &quot;Consolas&quot;, &quot;Monaco&quot;, monospace;
     font-size: 14px;
     color: #1f2937;
 }
@@ -177,16 +190,13 @@ QProgressBar::chunk {
 }
 
 /* ========== 重点优化：菜单栏样式 ========== */
-/* 主菜单栏样式（与整体浅灰底色统一） */
 QMenuBar {
-    background-color: #f9fafb; /* 匹配主窗口底色 */
-    border-bottom: 2px solid #e5e7eb; /* 轻量化分割线 */
+    background-color: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
     font-size: 15px;
     font-weight: 500;
-    color: #1f2937; /* 文字颜色匹配分组框 */
+    color: #1f2937;
 }
-
-/* 主菜单项默认状态 */
 QMenuBar::item {
     padding: 8px 18px;
     margin: 2px;
@@ -195,45 +205,64 @@ QMenuBar::item {
     background-color: transparent;
     border: 2px solid transparent;
 }
-
-/* 主菜单项悬停/选中状态（匹配按钮渐变风格） */
 QMenuBar::item:selected {
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4d9eff,stop:1 #3b82f6);
-    color: white; /* 白色文字提高对比度 */
-    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff; /* 匹配按钮边框 */
+    color: white;
+    border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff;
 }
-
-/* 子菜单容器样式（统一圆角+边框） */
 QMenu {
-    background-color: #ffffff; /* 白色背景匹配分组框 */
-    border: 2px solid #e5e7eb; /* 轻量化边框 */
-    border-radius: 8px; /* 匹配分组框圆角 */
-    padding: 8px 0; /* 优化内边距 */
+    background-color: #ffffff;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px 0;
     font-size: 15px;
     color: #1f2937;
 }
-
-/* 子菜单项样式 */
 QMenu::item {
     padding: 8px 28px;
-    margin: 0 4px; /* 优化外边距 */
+    margin: 0 4px;
     border-radius: 6px;
     color: #1f2937;
     border: 2px solid transparent;
 }
-
-/* 子菜单项悬停状态（匹配按钮风格） */
 QMenu::item:selected {
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4d9eff,stop:1 #3b82f6);
     color: white;
     border-color: #73b6ff #3b82f6 #3b82f6 #73b6ff;
 }
-
-/* 子菜单分隔线（轻量化） */
 QMenu::separator {
     height: 2px;
-    background-color: #e5e7eb; /* 匹配边框颜色 */
+    background-color: #e5e7eb;
     margin: 6px 10px;
+}
+
+/* ========== 端口列表滚动区域样式 ========== */
+QScrollArea#port_scroll_area {
+    border: none;
+    background-color: transparent;
+}
+QScrollArea#port_scroll_area QWidget#scroll_content_widget {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background-color: #ffffff;
+    padding: 10px;
+}
+QScrollBar:vertical {
+    width: 8px;
+    background-color: #f3f4f6;
+    border-radius: 4px;
+    margin: 0 2px;
+}
+QScrollBar::handle:vertical {
+    background-color: #d1d5db;
+    border-radius: 4px;
+    min-height: 30px;
+}
+QScrollBar::handle:vertical:hover {
+    background-color: #9ca3af;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
 }
    </string>
   </property>
@@ -242,9 +271,9 @@ QMenu::separator {
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>40</y>
+      <y>10</y>
       <width>821</width>
-      <height>631</height>
+      <height>641</height>
      </rect>
     </property>
     <property name="title">
@@ -255,9 +284,9 @@ QMenu::separator {
     <property name="geometry">
      <rect>
       <x>860</x>
-      <y>40</y>
+      <y>10</y>
       <width>341</width>
-      <height>631</height>
+      <height>641</height>
      </rect>
     </property>
     <property name="title">
@@ -295,7 +324,7 @@ QMenu::separator {
     <widget class="QPushButton" name="log_clear_btn">
      <property name="geometry">
       <rect>
-       <x>114</x>
+       <x>120</x>
        <y>590</y>
        <width>90</width>
        <height>32</height>
@@ -323,9 +352,9 @@ QMenu::separator {
     <property name="geometry">
      <rect>
       <x>1230</x>
-      <y>40</y>
+      <y>10</y>
       <width>261</width>
-      <height>631</height>
+      <height>641</height>
      </rect>
     </property>
     <property name="title">
@@ -367,21 +396,11 @@ QMenu::separator {
       <string>端口列表</string>
      </property>
     </widget>
-    <widget class="QComboBox" name="port_list_combo">
-     <property name="geometry">
-      <rect>
-       <x>85</x>
-       <y>125</y>
-       <width>161</width>
-       <height>42</height>
-      </rect>
-     </property>
-    </widget>
     <widget class="QPushButton" name="refresh_btn">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>230</y>
+       <y>590</y>
        <width>93</width>
        <height>32</height>
       </rect>
@@ -393,15 +412,43 @@ QMenu::separator {
     <widget class="QCheckBox" name="select_all_check">
      <property name="geometry">
       <rect>
-       <x>140</x>
-       <y>230</y>
+       <x>130</x>
+       <y>590</y>
        <width>98</width>
-       <height>32</height>
+       <height>41</height>
       </rect>
      </property>
      <property name="text">
       <string>全选</string>
      </property>
+    </widget>
+    <widget class="QScrollArea" name="port_scroll_area">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>190</y>
+       <width>231</width>
+       <height>371</height>
+      </rect>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scroll_content_widget">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>231</width>
+        <height>371</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="port_list_Layout">
+       <property name="spacing">
+        <number>8</number>
+       </property>
+      </layout>
+     </widget>
     </widget>
    </widget>
    <widget class="QProgressBar" name="test_progress_bar">

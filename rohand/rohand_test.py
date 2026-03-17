@@ -4,14 +4,25 @@ import sys
 import os
 import random
 from datetime import datetime
+
+import logging
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
-    QTableWidget, QTableWidgetItem
+    QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor
 from PyQt5.uic import loadUi
 
+from rohand.rohand_manager import RohanManager
+
+
+# ==============================
+# 变量定义
+# ==============================
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # ==============================
 # 测试线程类
@@ -79,9 +90,33 @@ class TestThread(QThread):
 # 主窗口类（完全保留原UI加载逻辑）
 # ==============================
 class RoHandTestWindow(QMainWindow):
+    # 以下定义Treeview表格的列名
+    STR_PORT = '端口号'
+    STR_SOFTWARE_VERSION = '软件版本'
+    STR_DEVICE_ID = '设备ID'
+    STR_CONNECT_STATUS = '连接状态'
+    STR_TEST_RESULT = '测试结果'
+
+    # 表头
+    HEADS = [
+        STR_PORT,
+        STR_SOFTWARE_VERSION,
+        STR_DEVICE_ID,
+        STR_CONNECT_STATUS,
+        STR_TEST_RESULT
+    ]
+
+    # 老化时间选项
+    aging_duration_options = ['0.5小时', '1小时', '1.5小时', '3小时', '8小时', '12小时', '24小时']
+
     def __init__(self, parent=None):
         super().__init__(parent)
         # 完全保留原始UI加载逻辑，未做任何修改
+        self.select_port_names = []
+        self.port_names = ['无可用端口']
+        self.test_data_table = None
+        # self.port_list_Layout = None
+        self.check_box_list = []  # 存储复选框，防止重复/内存泄漏
         current_dir = os.path.dirname(os.path.abspath(__file__))
         ui_path = os.path.join(current_dir, "rohand_test.ui")
         if not os.path.exists(ui_path):
@@ -106,15 +141,28 @@ class RoHandTestWindow(QMainWindow):
         # 测试数据表格
         self.test_data_table = QTableWidget(self.test_data_group)
         self.test_data_table.setGeometry(10, 30, 800, 580)
-        self.test_data_table.setColumnCount(4)
-        self.test_data_table.setHorizontalHeaderLabels(["用例ID", "用例名称", "状态", "结果"])
+        self.test_data_table.setColumnCount(5)
+        self.test_data_table.setHorizontalHeaderLabels(self.HEADS)
         self.test_data_table.setRowCount(100)
-        self.test_data_table.horizontalHeader().setStretchLastSection(True)
+        # 核心修正：获取水平表头对象 + 设置所有列等分
+        header = self.test_data_table.horizontalHeader()  # 正确获取表头对象
+        header.setSectionResizeMode(QHeaderView.Stretch)  # 设置列等分
 
         # 下拉框初始化
-        self.aging_time_combo.addItems(["1小时", "2小时", "4小时", "8小时", "12小时"])
-        self.port_list_combo.addItems(["COM1", "COM2", "COM3", "COM4", "COM5"])
-
+        self.aging_time_combo.addItems(self.aging_duration_options)
+        port_container = self.port_list_Layout.parentWidget()
+        if port_container:
+            # 2. 设置边框样式（可自定义颜色/宽度/圆角）
+            port_container.setStyleSheet("""
+                       QWidget {
+                           border: 1px solid #CCCCCC;  /* 边框宽度+样式+颜色 */
+                           border-radius: 4px;         /* 圆角（可选） */
+                           background-color: white;  /* 背景色（可选） */
+                           padding: 5px;              /* 内边距（防止控件贴边框） */
+                       }
+                   """)
+        # ===========================================================
+        self.port_list_Layout.setContentsMargins(12,8,18,8)
         # 进度条初始化
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
@@ -175,11 +223,149 @@ class RoHandTestWindow(QMainWindow):
                 f.write(self.log_text_edit.toPlainText())
             self.log_text_edit.append(f"[{self.get_time()}] 日志已保存：{os.path.basename(filename)}")
 
+
+    def on_port_cbx_clicked(self, checked, checkbox):
+        """复选框点击事件（修复全选逻辑+异常捕获）"""
+        try:
+            port = checkbox.text()
+            # 1. 全选逻辑（需先创建"全选"复选框才生效）
+            if port == '全选':
+                self.select_port_names = self.port_names.copy() if checked else []
+                for cbx in self.check_box_list:
+                    if cbx.text() != '全选':  # 跳过全选自身
+                        cbx.setChecked(checked)
+                        # self.update_device_list(port=cbx.text(), isChecked=checked)
+            # 2. 单个端口逻辑
+            else:
+                if checked and port not in self.select_port_names:
+                    self.select_port_names.append(port)
+                elif not checked and port in self.select_port_names:
+                    self.select_port_names.remove(port)
+                # self.update_device_list(port=port, isChecked=checked)
+
+            self.log_text_edit.append(
+                f"[{self.get_time()}] 端口 {port} {'选中' if checked else '取消选中'}，已选：{self.select_port_names}")
+        except Exception as e:
+            self.log_text_edit.append(f"[{self.get_time()}] 复选框操作失败：{str(e)}")
+
     def on_refresh(self):
-        self.log_text_edit.append(f"[{self.get_time()}] 端口/配置已刷新")
+        """彻底修复：防崩溃+内存安全+可选加全选"""
+        try:
+            # 1. 安全清空（先判空，避免布局不存在报错）
+            if not hasattr(self, 'port_list_Layout') or self.port_list_Layout is None:
+                self.log_text_edit.append(f"[{self.get_time()}] 错误：port_list_Layout 未加载！")
+                return
+
+            # 2. 彻底清空旧布局和列表
+            self.check_box_list.clear()
+            self.select_port_names.clear()
+            self.remove_all_widgets_from_layout(self.port_list_Layout)
+
+            # 3. 读取端口（加异常捕获）
+            rohanManager = RohanManager(protocol_type=1)
+            self.port_names = rohanManager.read_port_info() or ['无可用端口']
+            logger.info(f"检测到端口：{self.port_names}")
+
+            # 4. 无端口处理
+            if not self.port_names or self.port_names[0] == '无可用端口':
+                self.log_text_edit.append(f"[{self.get_time()}] 无可用端口")
+                return
+
+            # 5. 布局配置（每列8个，最多1列）
+            max_per_col = 8
+            max_col = 1
+            vertical_layouts = []
+
+            # ========== 可选：添加"全选"复选框（开启全选逻辑需此行） ==========
+            # all_check = QCheckBox("全选")
+            # self.check_box_list.append(all_check)
+            # all_check.clicked.connect(lambda checked, cb=all_check: self.on_port_cbx_clicked(checked, cb))
+            # =================================================================
+
+            # 6. 生成端口复选框
+            for idx, port in enumerate(self.port_names):
+                # check_box = QCheckBox(port)
+                check_box = QCheckBox(port)
+                check_box.setStyleSheet("""
+                    QCheckBox {
+                        font-size: 14px;
+                        padding: 6px 10px;
+                        margin: 4px 0px;
+                        border: 1px solid #cccccc;
+                        border-radius: 4px;
+                        background-color: white;
+                    }
+                    QCheckBox:hover {
+                        background-color: #f5f5f5;
+                        border-color: #999999;
+                    }
+                    QCheckBox:checked {
+                        background-color: #e0f0ff;
+                        border-color: #66b1ff;
+                        color: #005fb8;
+                    }
+                """)
+
+                self.check_box_list.append(check_box)
+
+                col = idx // max_per_col
+                if col >= max_col:
+                    self.log_text_edit.append(f"[{self.get_time()}] 端口过多，仅显示前{max_col * max_per_col}个")
+                    break
+
+                # 新建列布局
+                if col >= len(vertical_layouts):
+                    vl = QVBoxLayout()
+                    vl.setAlignment(Qt.AlignTop)
+                    vl.setSpacing(8)
+                    self.port_list_Layout.addLayout(vl)
+                    vertical_layouts.append(vl)
+
+                # 添加复选框（指定父控件，防内存泄漏）
+                vertical_layouts[col].addWidget(check_box)
+                # 绑定事件（闭包陷阱修复）
+                check_box.clicked.connect(lambda checked, cb=check_box: self.on_port_cbx_clicked(checked, cb))
+
+            # 7. 布局样式
+            self.port_list_Layout.setContentsMargins(12, 8, 18, 8)
+            self.port_list_Layout.setSpacing(10)
+
+            self.log_text_edit.append(f"[{self.get_time()}] 端口刷新完成，共{len(self.check_box_list)}个端口")
+        except Exception as e:
+            self.log_text_edit.append(f"[{self.get_time()}] 刷新端口崩溃：{str(e)}")
+            import traceback
+            self.log_text_edit.append(f"错误详情：{traceback.format_exc()}")
+
+    def remove_all_widgets_from_layout(self, layout):
+        """彻底销毁控件，防止堆损坏（核心修复）"""
+        if layout is None:
+            return
+        # 倒序删除，避免索引错乱
+        while layout.count() > 0:
+            item = layout.takeAt(0)
+            # 1. 销毁控件（关键：deleteLater 而非 setParent）
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()  # 彻底销毁，释放内存
+                widget = None
+            # 2. 递归清空子布局
+            sub_layout = item.layout()
+            if sub_layout:
+                self.remove_all_widgets_from_layout(sub_layout)
+                sub_layout = None
 
     def on_select_all(self, state):
-        self.log_text_edit.append(f"[{self.get_time()}] 全选状态：{'选中' if state == Qt.Checked else '取消'}")
+        """兼容原有全选按钮（可选保留）"""
+        try:
+            checked = state == Qt.Checked
+            self.select_port_names = self.port_names.copy() if checked else []
+            for cbx in self.check_box_list:
+                cbx.setChecked(checked)
+                # self.update_device_list(port=cbx.text(), isChecked=checked)
+            self.log_text_edit.append(
+                f"[{self.get_time()}] 全选状态：{'选中' if checked else '取消'}，已选：{self.select_port_names}")
+        except Exception as e:
+            self.log_text_edit.append(f"[{self.get_time()}] 全选操作失败：{str(e)}")
 
     def on_start_test(self):
         if not self.test_thread.isRunning():
