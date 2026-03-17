@@ -52,7 +52,7 @@ ABOUT_CONTENT = """
 
 MODULE_MAPPING: Dict[str, Dict[str, str]] = {
     "应用程序测试": {
-        "module_path": "app_test_ui",
+        "module_path": "app.app_test",
         "class_name": "AppTestWindow"
     },
     "灵巧手测试": {
