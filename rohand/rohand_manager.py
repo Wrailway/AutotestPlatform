@@ -4,32 +4,38 @@ import can
 import configparser
 import logging
 import sys
+
 # 修复 pymodbus 串口导入路径
 from pymodbus.client import ModbusSerialClient
 from pymodbus import exceptions as modbus_exceptions
 # 正确的串口列表读取模块
 import serial.tools.list_ports
 
+from rohand.can_client import CanClient
+from rohand.modbus_client import ModbusClient
+
 # ==============================
-# 日志配置（关键：让 logger.info 能打印）
+# 日志配置
 # ==============================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.StreamHandler(sys.stdout),  # 控制台输出
-        logging.FileHandler("rohan_manager.log", encoding="utf-8")  # 日志文件
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("rohan_manager.log", encoding="utf-8")
     ]
 )
 logger = logging.getLogger(__name__)
+
 
 # ==============================
 # 通用 CAN/Modbus 端口管理类
 # ==============================
 class RohanManager:
-    # 协议类型常量（大写+注释，规范）
-    MODBUS_PROTOCOL = 0    # 串口 Modbus
+    # 协议类型常量
+    MODBUS_PROTOCOL = 0  # 串口 Modbus
     PEAK_CAN_PROTOCOL = 1  # PEAK CAN 总线
+    client = None
 
     def __init__(self, protocol_type):
         """
@@ -37,11 +43,39 @@ class RohanManager:
         :param protocol_type: 协议类型（0=Modbus，1=PEAK CAN）
         """
         self.protocol_type = protocol_type
+        self.port = None  # 当前端口（初始化时为空）
+        self.node_id = 2  # 默认从站地址
+        self.client = None  # 客户端延迟初始化（避免传入None端口）
         logger.info(f"初始化管理器，协议类型：{self._get_protocol_name()}")
 
     def _get_protocol_name(self):
-        """辅助函数：返回协议名称（日志友好）"""
+        """辅助函数：返回协议名称"""
         return "Modbus" if self.protocol_type == self.MODBUS_PROTOCOL else "PEAK CAN"
+
+    def create_client(self, port):
+        """
+        延迟创建客户端（关键修正：避免初始化时传入None端口）
+        :param port: 具体端口号（如 COM1 / PCAN_USBBUS1）
+        """
+        if port == "无可用端口":
+            logger.error(f"无法创建客户端：端口无效 {port}")
+            return False
+
+        self.port = port
+        try:
+            if self.protocol_type == self.MODBUS_PROTOCOL:
+                self.client = ModbusClient(port)  # 创建Modbus客户端
+                self.client.connect()  # 建立连接
+            else:
+                self.client = CanClient(port)  # 创建CAN客户端
+                self.client.connect()  # 建立连接
+            logger.info(f"成功创建 {self._get_protocol_name()} 客户端：{port}")
+            return True
+        except Exception as e:
+            logger.error(f"创建 {self._get_protocol_name()} 客户端失败：{str(e)}")
+            self.client = None
+            self.port = None
+            return False
 
     def read_port_info(self):
         """
@@ -53,9 +87,8 @@ class RohanManager:
 
         try:
             if self.protocol_type == self.MODBUS_PROTOCOL:
-                # ========== 修复：Modbus 串口读取 ==========
+                # Modbus 串口读取
                 port_infos = serial.tools.list_ports.comports()
-                # 过滤有效串口（排除空设备、蓝牙串口等）
                 ports = [
                     port_info.device
                     for port_info in port_infos
@@ -63,45 +96,112 @@ class RohanManager:
                 ]
 
             else:
-                # ========== 修复：CAN 端口读取 ==========
-                # 兼容 python-can 不同版本的接口
+                # CAN 端口读取
                 try:
                     available_configs = can.interface.detect_available_configs()
                 except AttributeError:
-                    # 旧版本 python-can 兼容
                     available_configs = can.Bus._detect_available_configs()
 
-                # 过滤 PEAK CAN 端口（PCAN_USBBUS 开头）
                 peak_configs = [
                     cfg for cfg in available_configs
                     if cfg.get("channel", "").startswith("PCAN_USBBUS")
                 ]
                 ports = [cfg["channel"] for cfg in peak_configs] if peak_configs else []
 
-            # 处理无端口场景
             if not ports:
                 logger.warning(f"未检测到 {self._get_protocol_name()} 端口")
-                ports = ["无可用端口"]  # 与前端逻辑对齐
+                ports = ["无可用端口"]
             else:
                 logger.info(f"检测到 {len(ports)} 个 {self._get_protocol_name()} 端口：{ports}")
 
         except Exception as e:
-            # 捕获所有异常，避免崩溃
             logger.error(f"读取 {self._get_protocol_name()} 端口失败：{str(e)}", exc_info=True)
             ports = ["无可用端口"]
 
         return ports
 
     # ==============================
-    # 配置文件读取内部类（保留+优化）
+    # 补充 Modbus 写寄存器函数（修正调用逻辑）
+    # ==============================
+    def mb_send_cmd_to_device(self, address, value, slave=None):
+        """
+        向指定的寄存器地址写入数据。
+        :param address: 要写入的寄存器地址。
+        :param value: 要写入的值。
+        :param slave: 从站地址（默认使用self.node_id）
+        :return: 如果写入成功则返回True，否则返回False。
+        """
+        # 前置校验
+        if self.protocol_type != self.MODBUS_PROTOCOL or not self.client:
+            logger.error("Modbus客户端未初始化，无法写寄存器")
+            return False
+
+        slave_id = slave if slave is not None else self.node_id
+
+        try:
+            # 适配ModbusClient的write_registers调用（修正参数顺序）
+            response = self.client.serialClient.write_registers(
+                address=address,
+                values=value,
+                device_id=slave_id
+            )
+            if not response.isError():
+                logger.info(f'[port = {self.port}]写寄存器成功: 地址={address}, 值={value}')
+                return True
+            else:
+                # 调用ModbusClient自带的异常解析函数
+                error_type = self.client.get_exception(response, slave_id)
+                logger.error(f'[port = {self.port}]写寄存器失败: {error_type}\n')
+                return False
+        except Exception as e:
+            logger.error(f'[port = {self.port}]写寄存器异常: {str(e)}')
+            return False
+
+    # ==============================
+    # 补充 Modbus 读寄存器函数（修正调用逻辑）
+    # ==============================
+    def mb_receive_data_from_device(self, address, count, slave=None):
+        """
+        从指定的寄存器地址读取数据。
+        :param address: 要读取的寄存器地址。
+        :param count: 要读取的寄存器数量。
+        :param slave: 从站地址（默认使用self.node_id）
+        :return: 成功返回寄存器值列表，失败返回None。
+        """
+        # 前置校验
+        if self.protocol_type != self.MODBUS_PROTOCOL or not self.client:
+            logger.error("Modbus客户端未初始化，无法读寄存器")
+            return None
+
+        slave_id = slave if slave is not None else self.node_id
+        response = None
+
+        try:
+            # 适配ModbusClient的read_holding_registers调用
+            response = self.client.serialClient.read_holding_registers(
+                address=address,
+                count=count,
+                device_id=slave_id
+            )
+            if response.isError():
+                error_type = self.client.get_exception(response, slave_id)
+                logger.error(f'[port = {self.port}]读寄存器失败: {error_type}\n')
+                return None
+            logger.info(f'[port = {self.port}]读寄存器成功: 地址={address}, 数量={count}, 数据={response.registers}')
+            return response.registers
+        except Exception as e:
+            logger.error(f'[port = {self.port}]读寄存器异常: {str(e)}')
+            return None
+
+    # ==============================
+    # 配置文件读取内部类（保留原代码）
     # ==============================
     class ConfigReader:
-        """读取 config.ini 配置文件的工具类（支持中文、异常处理）"""
+        """读取 config.ini 配置文件的工具类"""
 
         def __init__(self, config_file_path="config.ini"):
             self.config_file_path = config_file_path
             self.config = configparser.ConfigParser()
-            # 读取配置文件（兼容不同编码）
             try:
                 self.config.read(self.config_file_path, encoding='UTF-8')
                 logger.info(f"成功加载配置文件：{self.config_file_path}")
@@ -111,13 +211,6 @@ class RohanManager:
                 logger.error(f"读取配置文件失败：{str(e)}", exc_info=True)
 
         def get_value(self, section, key, default=None):
-            """
-            获取指定配置值
-            :param section: 配置段
-            :param key: 配置键
-            :param default: 默认值（可选）
-            :return: 配置值 / 默认值
-            """
             try:
                 return self.config.get(section, key, fallback=default)
             except Exception as e:
@@ -125,11 +218,6 @@ class RohanManager:
                 return default
 
         def get_section(self, section):
-            """
-            获取指定配置段的所有键值对
-            :param section: 配置段
-            :return: 字典 / None
-            """
             try:
                 if section in self.config.sections():
                     return dict(self.config.items(section))
@@ -140,8 +228,9 @@ class RohanManager:
                 logger.error(f"读取配置段 [{section}] 失败：{str(e)}", exc_info=True)
                 return None
 
+
 # ==============================
-# 测试代码（验证功能）
+# 测试代码
 # ==============================
 if __name__ == "__main__":
     # 测试 Modbus 端口读取
@@ -154,8 +243,30 @@ if __name__ == "__main__":
     can_ports = can_manager.read_port_info()
     print(f"PEAK CAN 可用端口：{can_ports}")
 
-    # 测试配置文件读取
-    config_reader = RohanManager.ConfigReader()
-    # 示例：读取 [CAN] 段的 baudrate 配置
-    baudrate = config_reader.get_value("CAN", "baudrate", default="500000")
-    print(f"\nCAN 波特率配置：{baudrate}")
+    # # 测试配置文件读取
+    # config_reader = RohanManager.ConfigReader()
+    # baudrate = config_reader.get_value("CAN", "baudrate", default="500000")
+    # print(f"CAN 波特率配置：{baudrate}")  # 修正原代码末尾多余的中文符号
+
+    # 测试 Modbus 客户端创建和读写（可选）
+    if modbus_ports and modbus_ports[0] != "无可用端口":
+        modbus_manager.create_client(modbus_ports[0])
+        # 测试写寄存器
+        write_ok = modbus_manager.mb_send_cmd_to_device(address=1115, value=[123])
+        print(f"写寄存器结果：{write_ok}")
+        # 测试读寄存器
+        read_data = modbus_manager.mb_receive_data_from_device(address=1115, count=2)
+        print(f"读寄存器结果：{read_data}")
+
+
+    #测试can客户端创建和读写
+    if can_ports and can_ports[0]!= "无可用端口":
+        can_manager.create_client(can_ports[0])
+        # 测试读寄存器
+        self_test_level = [0]
+        err, self_test_level_get = can_manager.client.serialClient.HAND_GetSelfTestLevel(2, self_test_level, [])
+        print(f"读寄存器结果：{self_test_level_get}")
+        # 测试写寄存器
+        remote_err = []
+        err2 = can_manager.client.serialClient.HAND_SetSelfTestLevel(2, 2, remote_err)
+        print(f"写寄存器结果：{err2}")

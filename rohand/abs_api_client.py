@@ -22,11 +22,3 @@ class ABSApiClient(ABC):
     @abstractmethod
     def disconnect(self):
         pass
-
-    # @abstractmethod
-    # def read_messages(self):
-    #     pass
-    #
-    # @abstractmethod
-    # def write_messages(self):
-    #     pass
