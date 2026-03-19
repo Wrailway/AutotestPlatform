@@ -115,8 +115,12 @@ class RohanManager:
                 logger.info(f"检测到 {len(ports)} 个 {self._get_protocol_name()} 端口：{ports}")
 
         except Exception as e:
+            # 同时写入日志文件，并让上层 UI 能拿到具体错误信息
             logger.error(f"读取 {self._get_protocol_name()} 端口失败：{str(e)}", exc_info=True)
+            # 统一返回“无可用端口”，并把异常抛给调用方（例如 PortRefreshThread），
+            # 这样主窗口可以在“动态日志输出区”显示详细错误。
             ports = ["无可用端口"]
+            raise
 
         return ports
 
@@ -139,7 +143,8 @@ class RohanManager:
         slave_id = slave if slave is not None else self.node_id
 
         try:
-            # 适配ModbusClient的write_registers调用（修正参数顺序）
+            # 适配当前 ModbusSerialClient 接口：
+            # 本工程统一使用 device_id 作为从站地址参数（与 OHandSerialAPI / ModbusClient 保持一致）
             response = self.client.serialClient.write_registers(
                 address=address,
                 values=value,
@@ -177,7 +182,8 @@ class RohanManager:
         response = None
 
         try:
-            # 适配ModbusClient的read_holding_registers调用
+            # 适配当前 ModbusSerialClient 接口：
+            # 本工程统一使用 device_id 作为从站地址参数（与 OHandSerialAPI / ModbusClient 保持一致）
             response = self.client.serialClient.read_holding_registers(
                 address=address,
                 count=count,
@@ -192,6 +198,79 @@ class RohanManager:
         except Exception as e:
             logger.error(f'[port = {self.port}]读寄存器异常: {str(e)}')
             return None
+
+    # ==============================
+    # 获取软件版本号
+    # ==============================
+
+    def get_firmware_version(self, id):
+        ROH_FW_VERSION = 1001  # 固件版本寄存器地址
+        SUCCESS = 0x00
+        sw_version = '无法获取软件版本'
+        if self.protocol_type == self.MODBUS_PROTOCOL:
+            response = self.mb_receive_data_from_device(address=ROH_FW_VERSION, count=2, slave=id)
+            if response is not None:
+                sw_version = self.convert_version_format(response)
+
+        else:
+            major, minor, revision = [0], [0], [0]
+            err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(id, major, minor,
+                                                                                                      revision, [])
+            if err == SUCCESS:
+                sw_version = f'v{major_get}.{minor_get}.{revision_get}'
+        return sw_version
+
+
+    def convert_version_format(self, registers):
+        if len(registers) >= 2:
+            value1 = registers[0]
+            value2 = registers[1]
+            major_version = (value1 >> 8) & 0xFF
+            minor_version = value1 & 0xFF
+            patch_version = value2 & 0xFF
+            return f"V{major_version}.{minor_version}.{patch_version}"
+        else:
+            return "无法获取"
+
+    def get_device_info(self, port):
+        ROH_FW_VERSION = 1001  # 固件版本寄存器地址
+        MAX_ID = 247
+        SUCCESS = 0x00
+        STR_PORT = '端口号'
+        STR_SOFTWARE_VERSION = '软件版本'
+        STR_DEVICE_ID = '设备ID'
+        STR_CONNECT_STATUS = '连接状态'
+        STR_TEST_RESULT = '测试结果'
+        for id in range(2, MAX_ID):
+            if self.protocol_type == self.MODBUS_PROTOCOL:
+                response = self.mb_receive_data_from_device(ROH_FW_VERSION, 2, id)
+                if response is not None:
+                    sw_version = self.convert_version_format(response)
+                    node_id = id
+                    connect_status = '已连接'
+                    return {
+                        STR_PORT: port,
+                        STR_SOFTWARE_VERSION: sw_version,
+                        STR_DEVICE_ID: node_id,
+                        STR_CONNECT_STATUS: connect_status,
+                        STR_TEST_RESULT: '--'
+                    }
+            else:
+                major, minor, revision = [0], [0], [0]
+                err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(id, major, minor,
+                                                                                                      revision, [])
+                if err == SUCCESS:
+                    sw_version = f'V{major_get}.{minor_get}.{revision_get}'
+                    node_id = id
+                    connect_status = '已连接'
+                    return {
+                        STR_PORT: port,
+                        STR_SOFTWARE_VERSION: sw_version,
+                        STR_DEVICE_ID: node_id,
+                        STR_CONNECT_STATUS: connect_status,
+                        STR_TEST_RESULT: '--'
+                    }
+        return None
 
     # ==============================
     # 配置文件读取内部类（保留原代码）
@@ -243,10 +322,10 @@ if __name__ == "__main__":
     can_ports = can_manager.read_port_info()
     print(f"PEAK CAN 可用端口：{can_ports}")
 
-    # # 测试配置文件读取
-    # config_reader = RohanManager.ConfigReader()
-    # baudrate = config_reader.get_value("CAN", "baudrate", default="500000")
-    # print(f"CAN 波特率配置：{baudrate}")  # 修正原代码末尾多余的中文符号
+    # 测试配置文件读取
+    config_reader = RohanManager.ConfigReader()
+    baudrate = config_reader.get_value("CAN", "baudrate", default="500000")
+    print(f"CAN 波特率配置：{baudrate}")
 
     # 测试 Modbus 客户端创建和读写（可选）
     if modbus_ports and modbus_ports[0] != "无可用端口":
@@ -262,11 +341,12 @@ if __name__ == "__main__":
     #测试can客户端创建和读写
     if can_ports and can_ports[0]!= "无可用端口":
         can_manager.create_client(can_ports[0])
-        # 测试读寄存器
-        self_test_level = [0]
-        err, self_test_level_get = can_manager.client.serialClient.HAND_GetSelfTestLevel(2, self_test_level, [])
-        print(f"读寄存器结果：{self_test_level_get}")
-        # 测试写寄存器
-        remote_err = []
-        err2 = can_manager.client.serialClient.HAND_SetSelfTestLevel(2, 2, remote_err)
-        print(f"写寄存器结果：{err2}")
+        if can_manager.client:
+            # 测试读寄存器
+            self_test_level = [0]
+            err, self_test_level_get = can_manager.client.serialClient.HAND_GetSelfTestLevel(2, self_test_level, [])
+            print(f"读寄存器结果：{self_test_level_get}")
+            # 测试写寄存器
+            remote_err = []
+            err2 = can_manager.client.serialClient.HAND_SetSelfTestLevel(2, 2, remote_err)
+            print(f"写寄存器结果：{err2}")

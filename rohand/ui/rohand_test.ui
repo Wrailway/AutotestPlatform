@@ -455,9 +455,9 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>670</y>
+      <y>662</y>
       <width>1471</width>
-      <height>23</height>
+      <height>31</height>
      </rect>
     </property>
     <property name="value">
@@ -590,7 +590,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
       </rect>
      </property>
      <property name="text">
-      <string>等待测试。。。。</string>
+      <string>等待测试. . . . . .</string>
      </property>
     </widget>
    </widget>
@@ -703,10 +703,16 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
    <property name="text">
     <string>加载脚本</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
   </action>
   <action name="action_exportReport">
    <property name="text">
     <string>输出报告</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
    </property>
   </action>
   <action name="action_exit">
@@ -718,10 +724,16 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
    <property name="text">
     <string>查看配置文件</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+F</string>
+   </property>
   </action>
   <action name="action_editConfigFile">
    <property name="text">
     <string>修改配置文件</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+H</string>
    </property>
   </action>
   <action name="action_blackTheme">
