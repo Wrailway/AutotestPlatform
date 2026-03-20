@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import logging
+import time
+from typing import Optional, List
+
 from pymodbus import FramerType
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ConnectionException
 
-from rohand.abs_api_client import ABSApiClient
+from abs_api_client import ABSApiClient
+from OHandSerialAPI import OHandSerialAPI, HAND_PROTOCOL_UART, HAND_RESP_SUCCESS
+
+try:
+    import serial.tools.list_ports
+except Exception:  # pragma: no cover
+    serial = None
 
 
 # ==============================
@@ -23,6 +32,7 @@ class ModbusClient(ABSApiClient):
 
     def __init__(self, port):
         ABSApiClient.__init__(self, port)
+        self._ohand_api: Optional[OHandSerialAPI] = None
 
     def connect(self):
         try:
@@ -39,9 +49,58 @@ class ModbusClient(ABSApiClient):
             try:
                 self.serialClient.close()
                 self.serialClient = None
+                self._ohand_api = None
                 logger.info(f"[port = {self.port}]Connection to Modbus device closed.\n")
             except Exception as e:
                 logger.error(f"[port = {self.port}]Error during teardown: {e}\n")
+
+    @staticmethod
+    def list_available_ports() -> List[str]:
+        """
+        返回系统可用串口（如 ["COM3", "COM6"]），过滤掉蓝牙虚拟串口。
+        """
+        if not hasattr(serial, "tools") or not hasattr(serial.tools, "list_ports"):
+            return []
+        ports = []
+        for port_info in serial.tools.list_ports.comports():
+            if not port_info.device:
+                continue
+            desc = (port_info.description or "").upper()
+            if "BLUETOOTH" in desc:
+                continue
+            ports.append(port_info.device)
+        return ports
+
+    def _get_underlying_serial(self):
+        """
+        尝试从 pymodbus 的 ModbusSerialClient 里拿到底层串口对象，
+        避免同一个 COM 口被打开两次导致占用失败。
+        """
+        if not self.serialClient:
+            return None
+        return getattr(self.serialClient, "socket", None) or getattr(self.serialClient, "serial", None)
+
+    @staticmethod
+    def _get_milli_seconds_impl():
+        return int(time.time() * 1000)
+
+    @staticmethod
+    def _delay_milli_seconds_impl(ms: int):
+        time.sleep(max(0, ms) / 1000.0)
+
+    @staticmethod
+    def _uart_send_data_impl(addr, data, length, context):
+        """
+        与 OHandSerialAPI 兼容的发送函数签名：(addr, data, length, context)
+        context 这里传入底层串口对象。
+        """
+        if context is None:
+            return 1
+        try:
+            context.write(bytes(data[:length]))
+            return 0
+        except Exception:
+            return 1
 
     # ROH 灵巧手错误代码
 

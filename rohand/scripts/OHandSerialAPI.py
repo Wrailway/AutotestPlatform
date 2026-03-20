@@ -328,10 +328,9 @@ class OHandSerialAPI:
             byte_count = len(out)
             err = self.HAND_GetResponse(hand_id, HAND_CMD_GET_FW_VERSION, self.timeout, out, remote_err)
             if err == HAND_RESP_SUCCESS:
-                # 修正字节顺序，根据实际设备返回的格式调整
-                major[0] = out[0]
-                minor[0] = out[1]
-                revision[0] = out[2] | (out[3] << 8)
+                revision[0] = out[0] | (out[1] << 8)
+                minor[0] = out[2]
+                major[0] = out[3]
         return err, major[0], minor[0], revision[0]
 
     def HAND_GetHardwareVersion(self, hand_id, hw_type, hw_ver, boot_version, remote_err):

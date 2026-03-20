@@ -4,9 +4,9 @@ import re
 
 import logging
 
-from rohand.OHandSerialAPI import HAND_PROTOCOL_UART, OHandSerialAPI
-from rohand.abs_api_client import ABSApiClient
-from rohand.can_interface import CAN_Init, send_data_impl, get_milli_seconds_impl, recv_data_impl, \
+from OHandSerialAPI import HAND_PROTOCOL_UART, OHandSerialAPI
+from abs_api_client import ABSApiClient
+from can_interface import CAN_Init, send_data_impl, get_milli_seconds_impl, recv_data_impl, \
     delay_milli_seconds_impl
 
 
