@@ -1,31 +1,57 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
 import can
 import configparser
 import logging
 import sys
 
-# 修复 pymodbus 串口导入路径
 from pymodbus.client import ModbusSerialClient
 from pymodbus import exceptions as modbus_exceptions
-# 正确的串口列表读取模块
 import serial.tools.list_ports
 
-from rohand.can_client import CanClient
-from rohand.modbus_client import ModbusClient
+from can_client import CanClient
+from modbus_client import ModbusClient
 
-# ==============================
-# 日志配置
-# ==============================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("rohan_manager.log", encoding="utf-8")
-    ]
-)
 logger = logging.getLogger(__name__)
+
+
+def _detect_can_available_configs():
+    """
+    枚举本机 CAN 接口（依赖 PyPI 包 python-can，import 名仍为 can）。
+    兼容不同版本的 API，避免 can 无 interface / 无 Bus 时盲目 fallback 报错。
+    """
+    # 1) 部分版本在包顶层提供
+    fn = getattr(can, "detect_available_configs", None)
+    if callable(fn):
+        return fn()
+
+    # 2) 常见：can.interface.detect_available_configs()
+    interface = getattr(can, "interface", None)
+    if interface is not None:
+        fn = getattr(interface, "detect_available_configs", None)
+        if callable(fn):
+            return fn()
+
+    # 3) 旧版内部接口
+    bus_cls = getattr(can, "Bus", None)
+    if bus_cls is not None:
+        fn = getattr(bus_cls, "_detect_available_configs", None)
+        if callable(fn):
+            return fn()
+
+    mod_file = getattr(can, "__file__", "?")
+    raise RuntimeError(
+        "未找到 python-can 的端口枚举 API（can 模块缺少 Bus/interface）。"
+        f"当前加载的 can 来自: {mod_file}。"
+        "请安装官方库: pip install -U python-can"
+    )
+
+
+# 全局单例：在界面根据配置确定 protocol 后创建，窗口销毁时释放
+_global_manager = None
+_config_cache_path = None
+_cached_protocol_type = None
 
 
 # ==============================
@@ -36,6 +62,88 @@ class RohanManager:
     MODBUS_PROTOCOL = 0  # 串口 Modbus
     PEAK_CAN_PROTOCOL = 1  # PEAK CAN 总线
     client = None
+
+    # ---------- 配置与全局实例（替代原 ConfigReader 嵌套类）----------
+    @staticmethod
+    def read_protocol_type_from_config(config_path: str) -> int:
+        """从 config.ini 读取 [protocol_type] protocol，失败返回 0（Modbus）。"""
+        global _config_cache_path, _cached_protocol_type
+        if _cached_protocol_type is not None and config_path == _config_cache_path:
+            return _cached_protocol_type
+        if not config_path or not os.path.isfile(config_path):
+            _cached_protocol_type = RohanManager.MODBUS_PROTOCOL
+            _config_cache_path = config_path
+            return _cached_protocol_type
+        cfg = configparser.ConfigParser()
+        try:
+            cfg.read(config_path, encoding="UTF-8")
+            _cached_protocol_type = int(cfg.get("protocol_type", "protocol", fallback="0").strip())
+        except Exception as e:
+            logger.warning(f"读取协议配置失败，使用 Modbus：{e}")
+            _cached_protocol_type = RohanManager.MODBUS_PROTOCOL
+        _config_cache_path = config_path
+        return _cached_protocol_type
+
+    @staticmethod
+    def read_config_value(config_path: str, section: str, key: str, default=None):
+        """读取任意配置项（与旧 ConfigReader.get_value 等价）。"""
+        if not config_path or not os.path.isfile(config_path):
+            return default
+        cfg = configparser.ConfigParser()
+        try:
+            cfg.read(config_path, encoding="UTF-8")
+            return cfg.get(section, key, fallback=default)
+        except Exception as e:
+            logger.warning(f"获取配置 [{section}][{key}] 失败：{e}")
+            return default
+
+    @staticmethod
+    def read_config_section(config_path: str, section: str):
+        """读取整个 section 为 dict（与旧 ConfigReader.get_section 等价）。"""
+        if not config_path or not os.path.isfile(config_path):
+            return None
+        cfg = configparser.ConfigParser()
+        try:
+            cfg.read(config_path, encoding="UTF-8")
+            if section in cfg.sections():
+                return dict(cfg.items(section))
+            logger.warning(f"配置段 [{section}] 不存在")
+            return None
+        except Exception as e:
+            logger.error(f"读取配置段 [{section}] 失败：{e}", exc_info=True)
+            return None
+
+    @classmethod
+    def get_global(cls):
+        """返回当前全局 RohanManager，可能为 None。"""
+        return _global_manager
+
+    @classmethod
+    def ensure_global(cls, protocol_type: int):
+        """
+        根据协议类型保证存在唯一全局实例；协议变化时先释放旧实例再新建。
+        """
+        global _global_manager
+        if _global_manager is not None and _global_manager.protocol_type == int(protocol_type):
+            return _global_manager
+        cls.release_global()
+        _global_manager = cls(int(protocol_type))
+        logger.info("已创建全局 RohanManager（protocol=%s）", protocol_type)
+        return _global_manager
+
+    @classmethod
+    def release_global(cls):
+        """断开连接并销毁全局管理器（界面关闭时调用）。"""
+        global _global_manager
+        if _global_manager is None:
+            return
+        try:
+            if getattr(_global_manager, "client", None):
+                _global_manager.client.disconnect()
+        except Exception as e:
+            logger.warning(f"释放全局管理器时断开连接异常：{e}")
+        _global_manager = None
+        logger.info("已释放全局 RohanManager")
 
     def __init__(self, protocol_type):
         """
@@ -96,11 +204,8 @@ class RohanManager:
                 ]
 
             else:
-                # CAN 端口读取
-                try:
-                    available_configs = can.interface.detect_available_configs()
-                except AttributeError:
-                    available_configs = can.Bus._detect_available_configs()
+                # CAN 端口读取（须正确安装 python-can）
+                available_configs = _detect_can_available_configs()
 
                 peak_configs = [
                     cfg for cfg in available_configs
@@ -272,41 +377,6 @@ class RohanManager:
                     }
         return None
 
-    # ==============================
-    # 配置文件读取内部类（保留原代码）
-    # ==============================
-    class ConfigReader:
-        """读取 config.ini 配置文件的工具类"""
-
-        def __init__(self, config_file_path="config.ini"):
-            self.config_file_path = config_file_path
-            self.config = configparser.ConfigParser()
-            try:
-                self.config.read(self.config_file_path, encoding='UTF-8')
-                logger.info(f"成功加载配置文件：{self.config_file_path}")
-            except FileNotFoundError:
-                logger.error(f"配置文件不存在：{self.config_file_path}")
-            except Exception as e:
-                logger.error(f"读取配置文件失败：{str(e)}", exc_info=True)
-
-        def get_value(self, section, key, default=None):
-            try:
-                return self.config.get(section, key, fallback=default)
-            except Exception as e:
-                logger.warning(f"获取配置 [{section}][{key}] 失败：{str(e)}")
-                return default
-
-        def get_section(self, section):
-            try:
-                if section in self.config.sections():
-                    return dict(self.config.items(section))
-                else:
-                    logger.warning(f"配置段 [{section}] 不存在")
-                    return None
-            except Exception as e:
-                logger.error(f"读取配置段 [{section}] 失败：{str(e)}", exc_info=True)
-                return None
-
 
 # ==============================
 # 测试代码
@@ -322,9 +392,10 @@ if __name__ == "__main__":
     can_ports = can_manager.read_port_info()
     print(f"PEAK CAN 可用端口：{can_ports}")
 
-    # 测试配置文件读取
-    config_reader = RohanManager.ConfigReader()
-    baudrate = config_reader.get_value("CAN", "baudrate", default="500000")
+    # 测试配置文件读取（使用 RohanManager 模块级 API）
+    demo_cfg = os.path.join(os.path.dirname(__file__), "..", "config", "config.ini")
+    demo_cfg = os.path.normpath(demo_cfg)
+    baudrate = RohanManager.read_config_value(demo_cfg, "CAN", "baudrate", default="500000")
     print(f"CAN 波特率配置：{baudrate}")
 
     # 测试 Modbus 客户端创建和读写（可选）

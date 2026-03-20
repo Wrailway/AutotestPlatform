@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-import random
+import logging
+import time
+import traceback
 from datetime import datetime
 
-import logging
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox,
@@ -16,16 +17,128 @@ from PyQt5.QtGui import QColor, QFont
 from PyQt5.uic import loadUi
 
 from rohand_manager import RohanManager
-import configparser
-import logging
-
-
-# ==============================
-# 变量定义
-# ==============================
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# 文件日志：统一写到 ../log/ClientTest_log_日期_时间戳.txt
+_log_file_configured = False
+
+
+def _setup_file_logging_once():
+    global _log_file_configured
+    if _log_file_configured:
+        return
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    log_folder = os.path.normpath(os.path.join(base_dir, "..", "log"))
+    os.makedirs(log_folder, exist_ok=True)
+
+    timestamp = str(int(time.time()))
+    current_date = time.strftime("%Y-%m-%d", time.localtime())
+    log_file_name = os.path.join(log_folder, f"ClientTest_log_{current_date}_{timestamp}.txt")
+
+    file_handler = logging.FileHandler(log_file_name, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    log_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(log_format)
+    setattr(file_handler, "_is_client_file_handler", True)
+
+    root_logger = logging.getLogger()
+    # 避免重复添加同类 handler
+    for h in root_logger.handlers:
+        if getattr(h, "_is_client_file_handler", False):
+            _log_file_configured = True
+            return
+    root_logger.addHandler(file_handler)
+    _log_file_configured = True
+
+
+_setup_file_logging_once()
+
+# ---------------------------------------------------------------------------
+# 文案与表格列名（集中定义，不放在 class 内；须与 rohand_manager.get_device_info 键一致）
+# ---------------------------------------------------------------------------
+COL_PORT = "端口号"
+COL_SOFTWARE_VERSION = "软件版本"
+COL_DEVICE_ID = "设备ID"
+COL_CONNECT_STATUS = "连接状态"
+COL_TEST_RESULT = "测试结果"
+
+TABLE_HEADERS = [
+    COL_PORT,
+    COL_SOFTWARE_VERSION,
+    COL_DEVICE_ID,
+    COL_CONNECT_STATUS,
+    COL_TEST_RESULT,
+]
+
+RESULT_PASS = "通过"
+RESULT_FAIL = "失败"
+RESULT_SKIP = "跳过"
+
+STATUS_CONNECTED_UI = "已连接"
+STATUS_WAIT_TEST = "等待测试"
+STATUS_TESTING = "测试中"
+STATUS_PAUSED = "测试暂停"
+STATUS_UNKNOWN_DEVICE = "未识别设备"
+STATUS_READ_FAIL = "读取失败"
+STATUS_NOT_CONNECTED = "未连接"
+
+MSG_HINT = "提示"
+MSG_REFRESH_PORT = "请刷新端口"
+MSG_REFRESHING_PORTS = "正在刷新端口..."
+BTN_REFRESH = "刷新"
+BTN_LATER = "稍后"
+LABEL_SELECT_ALL = "全选"
+
+DIALOG_REFRESH_TITLE = "正在刷新端口"
+DIALOG_REFRESH_TIP = "正在刷新端口..."
+
+DEFAULT_AGING_OPTIONS = [
+    "0.01小时", "0.1小时", "0.5小时", "1小时", "1.5小时",
+    "3小时", "8小时", "12小时", "24小时",
+]
+
+# 主窗口完全显示后再弹出「请刷新端口」的延迟（毫秒），避免与首帧同时阻塞
+REFRESH_PROMPT_DELAY_MS = 450
+
+
+class RoHandGuiLogFilter(logging.Filter):
+    """仅把关键信息打到界面日志区。"""
+
+    _INFO_KEYWORDS = (
+        "初始化管理器", "开始刷新端口", "检测到", "加载脚本", "测试启动",
+        "测试完成", "测试结束", "成功创建", "could not connect", "连接失败",
+        "端口", "脚本导入成功", "脚本导入失败", "测试启动失败",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        name = record.name or ""
+        if not (name.startswith("rohand") or name.startswith("__main__")):
+            return False
+        if record.levelno >= logging.WARNING:
+            return True
+        msg = (record.getMessage() or "").lower()
+        return any(k.lower() in msg for k in self._INFO_KEYWORDS)
+
+
+class GuiLogHandler(logging.Handler):
+    """将日志追加到 QTextEdit（线程安全投递到主线程）。"""
+
+    def __init__(self, append_fn):
+        super().__init__()
+        self.append_fn = append_fn
+        self._is_rohand_gui_handler = True
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+        except Exception:
+            return
+        try:
+            QTimer.singleShot(0, lambda m=msg: self.append_fn(m))
+        except Exception:
+            pass
 
 # ==============================
 # 自定义日志处理器，用于捕获测试脚本的日志
@@ -101,7 +214,7 @@ class TestThread(QThread):
             
             # 创建一个子线程来执行测试，以便在测试期间更新进度条
             import threading
-            test_result = ["失败"]
+            test_result = [RESULT_FAIL]
             
             def run_test():
                 nonlocal test_result
@@ -125,9 +238,9 @@ class TestThread(QThread):
             
             # 获取测试结果
             res = test_result[0]
-            success += 1 if res == "通过" else 0
-            fail += 1 if res == "失败" else 0
-            skip += 1 if res == "跳过" else 0
+            success += 1 if res == RESULT_PASS else 0
+            fail += 1 if res == RESULT_FAIL else 0
+            skip += 1 if res == RESULT_SKIP else 0
 
             self.log_update.emit(f"[{self.get_time()}] 测试端口 {port}：{res}")
             self.table_update.emit(i, port, "-", "-", res)
@@ -159,13 +272,13 @@ class TestThread(QThread):
             self.log_update.emit(f"[{self.get_time()}] 测试结束 - 成功：{success} | 失败：{fail} | 跳过：{skip}")
             # 发送信号更新测试状态标签为等待测试
             if self.parent and hasattr(self.parent, 'test_status_label'):
-                self.parent.test_status_label.setText("等待测试")
+                self.parent.test_status_label.setText(STATUS_WAIT_TEST)
         else:
             self.status_update.emit("测试已停止")
             self.log_update.emit(f"[{self.get_time()}] 测试被手动停止")
             # 发送信号更新测试状态标签为等待测试
             if self.parent and hasattr(self.parent, 'test_status_label'):
-                self.parent.test_status_label.setText("等待测试")
+                self.parent.test_status_label.setText(STATUS_WAIT_TEST)
 
     def import_script(self):
         """导入脚本模块"""
@@ -206,24 +319,24 @@ class TestThread(QThread):
                             # 检查是否所有手势测试都通过
                             all_passed = True
                             for gesture_result in port_result["gestures"]:
-                                if gesture_result["result"] != "通过":
+                                if gesture_result["result"] != RESULT_PASS:
                                     all_passed = False
                                     break
-                            return "通过" if all_passed else "失败"
+                            return RESULT_PASS if all_passed else RESULT_FAIL
                         else:
-                            return "失败"
+                            return RESULT_FAIL
                     except Exception as e:
                         self.log_update.emit(f"[{self.get_time()}] 脚本测试失败：{str(e)}")
-                        return "失败"
+                        return RESULT_FAIL
                 # 保持对原有test_port函数的支持
                 elif hasattr(script_module, 'test_port'):
                     # 使用脚本中的测试逻辑
                     try:
                         result = script_module.test_port(port, self.rohan_manager)
-                        return "通过" if result else "失败"
+                        return RESULT_PASS if result else RESULT_FAIL
                     except Exception as e:
                         self.log_update.emit(f"[{self.get_time()}] 脚本测试失败：{str(e)}")
-                        return "失败"
+                        return RESULT_FAIL
                     finally:
                         try:
                             if getattr(self.rohan_manager, "client", None):
@@ -234,7 +347,7 @@ class TestThread(QThread):
                     # 没有脚本，使用默认测试逻辑
                     if self.rohan_manager.create_client(port):
                         try:
-                            return "通过"
+                            return RESULT_PASS
                         finally:
                             try:
                                 if getattr(self.rohan_manager, "client", None):
@@ -242,12 +355,12 @@ class TestThread(QThread):
                             except Exception:
                                 pass
                     else:
-                        return "失败"
+                        return RESULT_FAIL
             else:
                 # 没有脚本模块，使用默认测试逻辑
                 if self.rohan_manager.create_client(port):
                     try:
-                        return "通过"
+                        return RESULT_PASS
                     finally:
                         try:
                             if getattr(self.rohan_manager, "client", None):
@@ -255,10 +368,10 @@ class TestThread(QThread):
                         except Exception:
                             pass
                 else:
-                    return "失败"
+                    return RESULT_FAIL
         except Exception as e:
             self.log_update.emit(f"[{self.get_time()}] 测试端口 {port} 异常：{str(e)}")
-            return "失败"
+            return RESULT_FAIL
 
     def pause(self):
         self.is_paused = True
@@ -297,7 +410,7 @@ class PortRefreshThread(QThread):
 
 
 class PortRefreshingDialog(QDialog):
-    def __init__(self, parent=None, title: str = "正在刷新端口", tip: str = "正在刷新端口...", timeout_seconds: int = 60):
+    def __init__(self, parent=None, title: str = DIALOG_REFRESH_TITLE, tip: str = DIALOG_REFRESH_TIP, timeout_seconds: int = 60):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -381,35 +494,17 @@ class PortRefreshingDialog(QDialog):
 # 主窗口类
 # ==============================
 class RoHandTestWindow(QMainWindow):
-    STR_PORT = '端口号'
-    STR_SOFTWARE_VERSION = '软件版本'
-    STR_DEVICE_ID = '设备ID'
-    STR_CONNECT_STATUS = '连接状态'
-    STR_TEST_RESULT = '测试结果'
-
-    HEADS = [
-        STR_PORT,
-        STR_SOFTWARE_VERSION,
-        STR_DEVICE_ID,
-        STR_CONNECT_STATUS,
-        STR_TEST_RESULT
-    ]
-
-    # 老化时间选项（将由 config.ini 覆盖）
-    aging_duration_options = ['0.01小时', '0.1小时', '0.5小时', '1小时', '1.5小时', '3小时', '8小时', '12小时', '24小时']
-
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._config = configparser.ConfigParser()
         self._config_path = self._get_config_path()
-        self.protocol_type = 0  # 0=Modbus, 1=CAN（将由 config.ini 覆盖）
+        self.protocol_type = 0  # 仅由 config.ini [protocol_type] protocol 决定
+        self._did_schedule_refresh_prompt = False
         self.select_port_names = []
         self.port_names = ['无可用端口']
         self.test_data_table = None
-        # self.port_list_Layout = None
-        self.check_box_list = []  # 存储复选框，防止重复/内存泄漏
-        self.script_loaded = False  # 跟踪脚本是否已加载
-        self.script_path = None  # 存储加载的脚本路径
+        self.check_box_list = []
+        self.script_loaded = False
+        self.script_path = None
         current_dir = os.path.dirname(os.path.abspath(__file__))
         ui_path = os.path.join(current_dir, "rohand_test.ui")
         if not os.path.exists(ui_path):
@@ -419,19 +514,14 @@ class RoHandTestWindow(QMainWindow):
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowFlags(self.windowFlags() | Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
 
+        self._load_protocol_from_config_file()
         self.init_ui()
-        # 保存“启动时默认主题”（UI 自带 QSS + init_ui 调整后的状态）
         self._default_qss = self.styleSheet() or ""
         self.bind_all_events()
-        # 将 rohand 日志同步到动态日志输出区
         self._attach_project_log_handler()
-        # 读取并应用配置（协议/老化选项/界面开关等）
-        self.reload_and_apply_config(show_message=False)
-        # 创建初始的TestThread实例，后续会在on_start_test中重新创建
-        self.test_thread = TestThread([], RohanManager(protocol_type=self.protocol_type), None, '0.5小时', self)
+        self.test_thread = TestThread([], RohanManager.ensure_global(self.protocol_type), None, '0.5小时', self)
         self.bind_thread_signals()
 
-        # 端口刷新相关状态
         self._port_refresh_thread = None
         self._port_refresh_dialog = None
         self._port_refresh_timeout_timer = QTimer(self)
@@ -439,50 +529,47 @@ class RoHandTestWindow(QMainWindow):
         self._port_refresh_timeout_timer.timeout.connect(self._on_port_refresh_timeout)
         self._port_refresh_timed_out = False
 
-        # 进入主窗口后弹出提示窗（要等 show() 之后）
-        QTimer.singleShot(0, self._prompt_refresh_ports)
+    def showEvent(self, event):
+        """主窗口首次完整显示后再弹出「请刷新端口」，避免与首帧同时弹窗卡死。"""
+        super().showEvent(event)
+        if self._did_schedule_refresh_prompt:
+            return
+        self._did_schedule_refresh_prompt = True
+        QTimer.singleShot(REFRESH_PROMPT_DELAY_MS, self._prompt_refresh_ports)
 
     def init_ui(self):
-        # 日志框配置
         self.log_text_edit.setReadOnly(True)
         self.log_text_edit.setFont(QFont("Consolas", 10))
 
-        # 测试表格
         self.test_data_table = QTableWidget(self.test_data_group)
         self.test_data_table.setGeometry(10, 30, 800, 580)
         self.test_data_table.setColumnCount(5)
-        self.test_data_table.setHorizontalHeaderLabels(self.HEADS)
+        self.test_data_table.setHorizontalHeaderLabels(TABLE_HEADERS)
         self.test_data_table.setRowCount(100)
-        # 核心修正：获取水平表头对象 + 设置所有列等分
-        header = self.test_data_table.horizontalHeader()  # 正确获取表头对象
-        header.setSectionResizeMode(QHeaderView.Stretch)  # 设置列等分
+        header = self.test_data_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
 
-        # 下拉框初始化（先放默认，随后会被配置覆盖）
-        self.aging_time_combo.addItems(self.aging_duration_options)
-        # ===========================================================
-        self.port_list_Layout.setContentsMargins(12,8,18,8)
-        # 进度条初始化
+        self.aging_time_combo.clear()
+        self.aging_time_combo.addItems(DEFAULT_AGING_OPTIONS)
+        self.port_list_Layout.setContentsMargins(12, 8, 18, 8)
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
 
-        # 结果标签初始化
         self.total_case_value.setText("0条")
         self.success_case_value.setText("0条")
         self.fail_case_value.setText("0条")
         self.skip_case_value.setText("0条")
-        
-        # 进入窗口后提示请刷新端口
-        self.log_text_edit.append(f"[{self.get_time()}] 请刷新端口")
-        self.status_bar.showMessage("请刷新端口")
+
+        self.log_text_edit.append(f"[{self.get_time()}] {MSG_REFRESH_PORT}")
+        self.status_bar.showMessage(MSG_REFRESH_PORT)
 
     def _prompt_refresh_ports(self):
-        """进入主界面后弹出小窗口提示刷新端口。"""
         box = QMessageBox(self)
-        box.setWindowTitle("提示")
+        box.setWindowTitle(MSG_HINT)
         box.setIcon(QMessageBox.Information)
-        box.setText("请刷新端口")
-        refresh_btn = box.addButton("刷新", QMessageBox.AcceptRole)
-        box.addButton("稍后", QMessageBox.RejectRole)
+        box.setText(MSG_REFRESH_PORT)
+        refresh_btn = box.addButton(BTN_REFRESH, QMessageBox.AcceptRole)
+        box.addButton(BTN_LATER, QMessageBox.RejectRole)
         box.exec_()
         if box.clickedButton() == refresh_btn:
             self.start_port_refresh()
@@ -545,10 +632,10 @@ class RoHandTestWindow(QMainWindow):
         try:
             port = checkbox.text()
             # 1. 全选逻辑（需先创建"全选"复选框才生效）
-            if port == '全选':
+            if port == LABEL_SELECT_ALL:
                 self.select_port_names = self.port_names.copy() if checked else []
                 for cbx in self.check_box_list:
-                    if cbx.text() != '全选':  # 跳过全选自身
+                    if cbx.text() != LABEL_SELECT_ALL:
                         cbx.setChecked(checked)
                         self.update_test_data_table(cbx.text(), checked)
             # 2. 单个端口逻辑
@@ -629,16 +716,14 @@ class RoHandTestWindow(QMainWindow):
             self.log_text_edit.append(f"[{self.get_time()}] 端口刷新完成，共{len(self.check_box_list)}个端口")
         except Exception as e:
             self.log_text_edit.append(f"[{self.get_time()}] 刷新端口崩溃：{str(e)}")
-            import traceback
             self.log_text_edit.append(f"错误详情：{traceback.format_exc()}")
 
     def start_port_refresh(self):
-        """点击刷新后：显示旋转圆圈动画 + 60秒超时 + 完成后自动停止。"""
+        """点击刷新后：显示动画 + 60秒超时 + 完成后自动停止。"""
         if self._port_refresh_thread and self._port_refresh_thread.isRunning():
             return
 
-        # 仅刷新协议类型，避免每次刷新端口都“重置窗口”
-        self._reload_protocol_from_config()
+        self._load_protocol_from_config_file()
         protocol_type = int(getattr(self, "protocol_type", 0) or 0)
         self.log_text_edit.append(f"[{self.get_time()}] 从配置文件读取协议类型：{protocol_type}（0=Modbus，1=CAN）")
 
@@ -652,7 +737,7 @@ class RoHandTestWindow(QMainWindow):
             self.log_text_edit.append(f"[{self.get_time()}] 开始刷新端口...")
 
         if self._port_refresh_dialog is None:
-            self._port_refresh_dialog = PortRefreshingDialog(self, tip="正在刷新端口...", timeout_seconds=60)
+            self._port_refresh_dialog = PortRefreshingDialog(self, tip=DIALOG_REFRESH_TIP, timeout_seconds=60)
         self._port_refresh_dialog.start()
 
         self._port_refresh_timeout_timer.start(60_000)
@@ -745,8 +830,8 @@ class RoHandTestWindow(QMainWindow):
             
             # 创建RohanManager实例
             # 只刷新协议类型配置，避免窗口在开始测试时被“重置”
-            self._reload_protocol_from_config()
-            rohan_manager = RohanManager(protocol_type=int(getattr(self, "protocol_type", 0) or 0))
+            self._load_protocol_from_config_file()
+            rohan_manager = RohanManager.ensure_global(int(getattr(self, "protocol_type", 0) or 0))
             # 创建新的测试线程，传递选中的端口列表、rohan_manager实例、脚本路径和老化时间
             self.test_thread = TestThread(self.select_port_names, rohan_manager, self.script_path, aging_time, self)
             self.bind_thread_signals()
@@ -755,7 +840,7 @@ class RoHandTestWindow(QMainWindow):
             # 恢复暂停测试按钮的文本
             self.pause_test_btn.setText("暂停测试")
             # 更新测试状态标签
-            self.test_status_label.setText("测试中")
+            self.test_status_label.setText(STATUS_TESTING)
             self.test_thread.start()
         else:
             self.log_text_edit.append(f"[{self.get_time()}] 测试已在运行中")
@@ -766,12 +851,12 @@ class RoHandTestWindow(QMainWindow):
                 self.test_thread.resume()
                 self.pause_test_btn.setText("暂停测试")
                 # 更新测试状态标签为测试中
-                self.test_status_label.setText("测试中")
+                self.test_status_label.setText(STATUS_TESTING)
             else:
                 self.test_thread.pause()
                 self.pause_test_btn.setText("恢复测试")
                 # 更新测试状态标签为测试暂停
-                self.test_status_label.setText("测试暂停")
+                self.test_status_label.setText(STATUS_PAUSED)
         else:
             self.log_text_edit.append(f"[{self.get_time()}] 测试未运行")
 
@@ -779,7 +864,7 @@ class RoHandTestWindow(QMainWindow):
         if self.test_thread.isRunning():
             self.test_thread.stop()
             # 更新测试状态标签为等待测试
-            self.test_status_label.setText("等待测试")
+            self.test_status_label.setText(STATUS_WAIT_TEST)
         else:
             self.log_text_edit.append(f"[{self.get_time()}] 测试未运行")
 
@@ -791,45 +876,25 @@ class RoHandTestWindow(QMainWindow):
             self.log_text_edit.append(f"[{self.get_time()}] 加载脚本：{os.path.basename(fn)}")
 
     def on_export_report(self):
-        # 默认保存到report文件夹
-        import os
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.log_text_edit.append(f"[{self.get_time()}] 当前文件目录：{current_dir}")
-        
-        # 直接在rohand目录下创建report文件夹
         report_dir = os.path.join(current_dir, "report")
-        self.log_text_edit.append(f"[{self.get_time()}] 报告保存目录：{report_dir}")
-        
-        # 确保report文件夹存在
-        if not os.path.exists(report_dir):
-            try:
-                os.makedirs(report_dir)
-                self.log_text_edit.append(f"[{self.get_time()}] 创建report文件夹成功：{report_dir}")
-            except Exception as e:
-                self.log_text_edit.append(f"[{self.get_time()}] 创建report文件夹失败：{str(e)}")
-                QMessageBox.warning(self, "错误", f"创建report文件夹失败：{str(e)}")
-                return
-        else:
-            self.log_text_edit.append(f"[{self.get_time()}] report文件夹已存在：{report_dir}")
-        
-        # 生成默认文件名
+        try:
+            os.makedirs(report_dir, exist_ok=True)
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"创建report文件夹失败：{str(e)}")
+            return
+
         default_filename = f"测试报告_{self.get_time().replace(':', '-')}.txt"
         default_path = os.path.join(report_dir, default_filename)
-        self.log_text_edit.append(f"[{self.get_time()}] 默认保存路径：{default_path}")
-        
-        # 打开文件保存对话框
         fn, _ = QFileDialog.getSaveFileName(
             self, "导出报告", default_path, "文本文件 (*.txt)"
         )
-        
+
         if fn:
-            self.log_text_edit.append(f"[{self.get_time()}] 用户选择的保存路径：{fn}")
             try:
-                # 确保文件所在目录存在
                 file_dir = os.path.dirname(fn)
                 if not os.path.exists(file_dir):
                     os.makedirs(file_dir)
-                    self.log_text_edit.append(f"[{self.get_time()}] 创建文件目录成功：{file_dir}")
                 
                 # 写入文件
                 with open(fn, "w", encoding="utf-8") as f:
@@ -903,16 +968,14 @@ class RoHandTestWindow(QMainWindow):
                     subprocess.run(["xdg-open", fn])
                     self.log_text_edit.append(f"[{self.get_time()}] 打开配置：{os.path.basename(fn)}")
 
-                # 打开后提示：保存文件后立即重载，使改动立刻反映到窗口功能
-                box = QMessageBox(self)
-                box.setWindowTitle("提示")
-                box.setIcon(QMessageBox.Information)
-                box.setText("已打开配置文件。\n修改并保存后，点击“确定”即可在窗口内立即生效。")
-                box.addButton("确定", QMessageBox.AcceptRole)
-                box.addButton("稍后", QMessageBox.RejectRole)
-                box.exec_()
-                if box.result() == 0:
-                    self.reload_and_apply_config(show_message=True)
+                QMessageBox.information(
+                    self,
+                    MSG_HINT,
+                    "已打开配置文件。\n仅 [protocol_type] 中 protocol=0/1 会切换 Modbus/CAN；\n"
+                    "保存后窗口将自动重启以应用新协议。",
+                )
+                # 使用一个定时器在消息框关闭后重启应用（避免当前事件栈中直接重启）
+                QTimer.singleShot(0, self._restart_application)
             except Exception as e:
                 self.log_text_edit.append(f"[{self.get_time()}] 打开配置文件失败：{str(e)}")
                 QMessageBox.warning(self, "错误", f"打开配置文件失败：{str(e)}")
@@ -1332,12 +1395,12 @@ class RoHandTestWindow(QMainWindow):
         # self.test_data_table.setItem(row, 1, QTableWidgetItem(case_name))
         # self.test_data_table.setItem(row, 2, QTableWidgetItem(status))
         # 更新连接状态为"已连接"
-        self.test_data_table.setItem(row, 3, QTableWidgetItem("已连接"))
+        self.test_data_table.setItem(row, 3, QTableWidgetItem(STATUS_CONNECTED_UI))
         # 更新测试结果
         item = QTableWidgetItem(res)
-        if res == "通过":
+        if res == RESULT_PASS:
             item.setForeground(QColor(0, 180, 0))
-        elif res == "失败":
+        elif res == RESULT_FAIL:
             item.setForeground(QColor(255, 0, 0))
         else:
             item.setForeground(QColor(200, 160, 0))
@@ -1378,18 +1441,18 @@ class RoHandTestWindow(QMainWindow):
                     # 正确调用：使用 rohand_manager.py 的 get_device_info()（内部会扫描有效ID并读取固件版本）。
                     software_version = "-"
                     device_id = "-"
-                    connect_status = "未连接"
+                    connect_status = STATUS_NOT_CONNECTED
 
                     rohan_manager = None
                     try:
                         # 使用当前配置中的协议类型（不在这里重新加载配置，避免窗口闪动）
-                        rohan_manager = RohanManager(protocol_type=int(getattr(self, "protocol_type", 0) or 0))
+                        rohan_manager = RohanManager.ensure_global(int(getattr(self, "protocol_type", 0) or 0))
                         if rohan_manager.create_client(port):
                             info = rohan_manager.get_device_info(port)
                             if info:
-                                software_version = str(info.get(self.STR_SOFTWARE_VERSION, "-"))
-                                device_id = str(info.get(self.STR_DEVICE_ID, "-"))
-                                connect_status = str(info.get(self.STR_CONNECT_STATUS, "已连接"))
+                                software_version = str(info.get(COL_SOFTWARE_VERSION, "-"))
+                                device_id = str(info.get(COL_DEVICE_ID, "-"))
+                                connect_status = str(info.get(COL_CONNECT_STATUS, STATUS_CONNECTED_UI))
                             else:
                                 # 兜底：如果 get_device_info 扫描不到设备，直接用默认节点ID读取固件版本
                                 try:
@@ -1398,17 +1461,17 @@ class RoHandTestWindow(QMainWindow):
                                     if sw and "无法获取" not in sw:
                                         software_version = str(sw)
                                         device_id = str(node_id)
-                                        connect_status = "已连接"
+                                        connect_status = STATUS_CONNECTED_UI
                                     else:
-                                        connect_status = "未识别设备"
+                                        connect_status = STATUS_UNKNOWN_DEVICE
                                 except Exception as inner_e:
                                     self.log_text_edit.append(
                                         f"[{self.get_time()}] 使用默认节点读取固件版本失败：{str(inner_e)}"
                                     )
-                                    connect_status = "未识别设备"
+                                    connect_status = STATUS_UNKNOWN_DEVICE
                     except Exception as e:
                         self.log_text_edit.append(f"[{self.get_time()}] 读取设备信息失败：{str(e)}")
-                        connect_status = "读取失败"
+                        connect_status = STATUS_READ_FAIL
                     finally:
                         try:
                             if rohan_manager and getattr(rohan_manager, "client", None):
@@ -1439,166 +1502,44 @@ class RoHandTestWindow(QMainWindow):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         return os.path.normpath(os.path.join(current_dir, "..", "config", "config.ini"))
 
-    def reload_and_apply_config(self, show_message: bool = False):
-        # 读取配置
-        try:
-            if os.path.exists(self._config_path):
-                self._config.read(self._config_path, encoding="UTF-8")
-            else:
-                if show_message:
-                    QMessageBox.warning(self, "提示", f"配置文件不存在：\n{self._config_path}")
-                return
-        except Exception as e:
-            self.log_text_edit.append(f"[{self.get_time()}] 读取配置文件失败：{str(e)}")
-            if show_message:
-                QMessageBox.warning(self, "错误", f"读取配置文件失败：{str(e)}")
-            return
-
-        # protocol
-        try:
-            self.protocol_type = int(self._config.get("protocol_type", "protocol", fallback="0").strip())
-        except Exception:
-            self.protocol_type = 0
-
-        # window 参数（仅在显式重载时才更新标题和位置，不影响刷新端口等操作体验）
-        window_name = self._config.get("window_parameter", "window_name", fallback="").strip().strip("'").strip('"')
-        if window_name:
-            self.setWindowTitle(window_name)
-        try:
-            pos_x = int(float(self._config.get("window_parameter", "postion_x", fallback="0").strip()))
-            pos_y = int(float(self._config.get("window_parameter", "postion_y", fallback="0").strip()))
-            if pos_x or pos_y:
-                self.move(pos_x, pos_y)
-        except Exception:
-            pass
-
-        # 日志与测试数据区默认始终可见，避免误配置导致看不到日志
-        if hasattr(self, "test_data_group"):
-            self.test_data_group.setVisible(True)
-        if hasattr(self, "log_text_edit"):
-            self.log_text_edit.setVisible(True)
-
-        # 老化选项：aging_options =  '0.001', '0.5', ...
-        raw_opts = self._config.get("aging_parameter", "aging_options", fallback="").strip()
-        parsed_opts = []
-        if raw_opts:
-            # 尽量宽松解析：去掉首尾引号，然后按逗号分割
-            cleaned = raw_opts.strip()
-            # 兼容你当前写法：包含多余空格/引号
-            cleaned = cleaned.replace("，", ",")
-            parts = [p.strip().strip("'").strip('"') for p in cleaned.split(",") if p.strip()]
-            for p in parts:
-                # 只接受能转成数字的项
-                try:
-                    float(p)
-                    parsed_opts.append(f"{p}小时")
-                except Exception:
-                    continue
-
-        if parsed_opts:
-            self.aging_duration_options = parsed_opts
-            try:
-                current = self.aging_time_combo.currentText()
-                self.aging_time_combo.clear()
-                self.aging_time_combo.addItems(self.aging_duration_options)
-                if current in self.aging_duration_options:
-                    self.aging_time_combo.setCurrentText(current)
-            except Exception:
-                pass
-
-        if show_message:
-            QMessageBox.information(
-                self,
-                "配置已生效",
-                f"protocol={self.protocol_type}（0=Modbus，1=CAN）\n老化选项数量={len(getattr(self, 'aging_duration_options', []))}",
-            )
-
-    def _reload_protocol_from_config(self):
-        """只从配置文件中刷新协议类型，不改动窗口其它行为，避免界面闪动。"""
-        try:
-            if os.path.exists(self._config_path):
-                self._config.read(self._config_path, encoding="UTF-8")
-            self.protocol_type = int(self._config.get("protocol_type", "protocol", fallback=str(self.protocol_type)).strip())
-        except Exception:
-            # 失败时保持当前 protocol_type 不变
-            pass
+    def _load_protocol_from_config_file(self):
+        """从 config.ini 读取协议并同步全局 RohanManager。"""
+        self.protocol_type = RohanManager.read_protocol_type_from_config(self._config_path)
+        RohanManager.ensure_global(self.protocol_type)
 
     def _attach_project_log_handler(self):
-        """
-        将 rohand 相关模块的日志同步输出到界面上的“动态日志输出”文本框。
-        通过 logging.Handler + Qt 单次定时器，保证来自其他线程的日志安全更新到 UI。
-        """
         if not hasattr(self, "log_text_edit"):
             return
 
-        class GuiLogHandler(logging.Handler):
-            def __init__(self, widget):
-                super().__init__()
-                self.widget = widget
-
-            def emit(self, record):
-                try:
-                    msg = self.format(record)
-                except Exception:
-                    return
-
-                # 使用 Qt 的单次定时器把 UI 更新切回主线程
-                try:
-                    QTimer.singleShot(0, lambda m=msg: self.widget.append(m))
-                except Exception:
-                    pass
-
-        handler = GuiLogHandler(self.log_text_edit)
+        handler = GuiLogHandler(self.log_text_edit.append)
         handler.setLevel(logging.INFO)
         handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        handler.addFilter(RoHandGuiLogFilter())
 
         root_logger = logging.getLogger()
-
-        class RoHandFilter(logging.Filter):
-            def filter(self, record: logging.LogRecord) -> bool:
-                name = record.name or ""
-                # 只关心本项目核心模块的日志
-                if not (name.startswith("rohand") or name.startswith("__main__")):
-                    return False
-
-                # 始终保留 WARNING/ERROR 级别
-                if record.levelno >= logging.WARNING:
-                    return True
-
-                # 对 INFO 级别做关键字筛选，避免日志区过于嘈杂
-                msg = (record.getMessage() or "").lower()
-                keywords = [
-                    "初始化管理器",
-                    "开始刷新端口",
-                    "检测到",
-                    "加载脚本",
-                    "测试启动",
-                    "测试完成",
-                    "测试结束",
-                    "成功创建",
-                    "could not connect",
-                    "连接失败",
-                    "端口",
-                    "脚本导入成功",
-                    "脚本导入失败",
-                    "测试启动失败",
-                ]
-                return any(k.lower() in msg for k in keywords)
-
-        handler.addFilter(RoHandFilter())
-
-        # 避免重复添加多个 handler
         for h in root_logger.handlers:
-            if isinstance(h, GuiLogHandler):
+            if getattr(h, "_is_rohand_gui_handler", False):
                 return
-
         root_logger.addHandler(handler)
 
     def closeEvent(self, event):
         if self.test_thread.isRunning():
             self.test_thread.stop()
             self.test_thread.wait()
+        RohanManager.release_global()
         event.accept()
+
+    def _restart_application(self):
+        """重启整个客户端进程，用于配置文件修改后生效。"""
+        try:
+            python = sys.executable or "python"
+            script = os.path.abspath(sys.argv[0])
+            import subprocess
+            subprocess.Popen([python, script])
+        except Exception as e:
+            self.log_text_edit.append(f"[{self.get_time()}] 重启应用失败：{e}")
+        finally:
+            QApplication.instance().quit()
 
 
 # ==============================
