@@ -63,32 +63,50 @@ class RohanManager:
     PEAK_CAN_PROTOCOL = 1  # PEAK CAN 总线
     client = None
 
-    # ---------- 配置与全局实例（替代原 ConfigReader 嵌套类）----------
+    # ---------- 配置读取方法 ----------
     @staticmethod
-    def read_protocol_type_from_config(config_path: str) -> int:
+    def get_config_path() -> str:
+        """获取配置文件路径"""
+        # 获取当前文件所在目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # 构建 config/config.ini 的路径
+        config_path = os.path.join(current_dir, "config", "config.ini")
+        return config_path
+
+    @staticmethod
+    def read_protocol_type_from_config(config_path: str = None) -> int:
         """从 config.ini 读取 [protocol_type] protocol，失败返回 0（Modbus）。"""
-        global _config_cache_path, _cached_protocol_type
-        if _cached_protocol_type is not None and config_path == _config_cache_path:
-            return _cached_protocol_type
-        if not config_path or not os.path.isfile(config_path):
-            _cached_protocol_type = RohanManager.MODBUS_PROTOCOL
-            _config_cache_path = config_path
-            return _cached_protocol_type
+        # 如果没有提供路径，使用默认路径
+        if not config_path:
+            config_path = RohanManager.get_config_path()
+        
+        if not os.path.isfile(config_path):
+            logger.warning(f"配置文件不存在：{config_path}，使用 Modbus 协议")
+            return RohanManager.MODBUS_PROTOCOL
+        
         cfg = configparser.ConfigParser()
         try:
             cfg.read(config_path, encoding="UTF-8")
-            _cached_protocol_type = int(cfg.get("protocol_type", "protocol", fallback="0").strip())
+            return int(cfg.get("protocol_type", "protocol", fallback="0").strip())
         except Exception as e:
             logger.warning(f"读取协议配置失败，使用 Modbus：{e}")
-            _cached_protocol_type = RohanManager.MODBUS_PROTOCOL
-        _config_cache_path = config_path
-        return _cached_protocol_type
+            return RohanManager.MODBUS_PROTOCOL
 
     @staticmethod
-    def read_config_value(config_path: str, section: str, key: str, default=None):
-        """读取任意配置项（与旧 ConfigReader.get_value 等价）。"""
-        if not config_path or not os.path.isfile(config_path):
+    def read_config_value(config_path: str = None, section: str = None, key: str = None, default=None):
+        """读取任意配置项"""
+        # 如果没有提供路径，使用默认路径
+        if not config_path:
+            config_path = RohanManager.get_config_path()
+        
+        if not os.path.isfile(config_path):
+            logger.warning(f"配置文件不存在：{config_path}")
             return default
+        
+        if not section or not key:
+            logger.warning("section 或 key 未提供")
+            return default
+        
         cfg = configparser.ConfigParser()
         try:
             cfg.read(config_path, encoding="UTF-8")
@@ -98,10 +116,20 @@ class RohanManager:
             return default
 
     @staticmethod
-    def read_config_section(config_path: str, section: str):
-        """读取整个 section 为 dict（与旧 ConfigReader.get_section 等价）。"""
-        if not config_path or not os.path.isfile(config_path):
+    def read_config_section(config_path: str = None, section: str = None):
+        """读取整个 section 为 dict"""
+        # 如果没有提供路径，使用默认路径
+        if not config_path:
+            config_path = RohanManager.get_config_path()
+        
+        if not os.path.isfile(config_path):
+            logger.warning(f"配置文件不存在：{config_path}")
             return None
+        
+        if not section:
+            logger.warning("section 未提供")
+            return None
+        
         cfg = configparser.ConfigParser()
         try:
             cfg.read(config_path, encoding="UTF-8")

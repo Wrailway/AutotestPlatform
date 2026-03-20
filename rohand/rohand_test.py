@@ -496,7 +496,7 @@ class PortRefreshingDialog(QDialog):
 class RoHandTestWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._config_path = self._get_config_path()
+        self._config_path = RohanManager.get_config_path()
         self.protocol_type = 0  # 仅由 config.ini [protocol_type] protocol 决定
         self._did_schedule_refresh_prompt = False
         self.select_port_names = []
@@ -519,7 +519,7 @@ class RoHandTestWindow(QMainWindow):
         self._default_qss = self.styleSheet() or ""
         self.bind_all_events()
         self._attach_project_log_handler()
-        self.test_thread = TestThread([], RohanManager.ensure_global(self.protocol_type), None, '0.5小时', self)
+        self.test_thread = TestThread([], self._get_manager(), None, '0.5小时', self)
         self.bind_thread_signals()
 
         self._port_refresh_thread = None
@@ -723,8 +723,7 @@ class RoHandTestWindow(QMainWindow):
         if self._port_refresh_thread and self._port_refresh_thread.isRunning():
             return
 
-        self._load_protocol_from_config_file()
-        protocol_type = int(getattr(self, "protocol_type", 0) or 0)
+        protocol_type = self._get_manager(refresh_protocol=True).protocol_type
         self.log_text_edit.append(f"[{self.get_time()}] 从配置文件读取协议类型：{protocol_type}（0=Modbus，1=CAN）")
 
         simulate_timeout = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
@@ -830,8 +829,7 @@ class RoHandTestWindow(QMainWindow):
             
             # 创建RohanManager实例
             # 只刷新协议类型配置，避免窗口在开始测试时被“重置”
-            self._load_protocol_from_config_file()
-            rohan_manager = RohanManager.ensure_global(int(getattr(self, "protocol_type", 0) or 0))
+            rohan_manager = self._get_manager(refresh_protocol=True)
             # 创建新的测试线程，传递选中的端口列表、rohan_manager实例、脚本路径和老化时间
             self.test_thread = TestThread(self.select_port_names, rohan_manager, self.script_path, aging_time, self)
             self.bind_thread_signals()
@@ -1445,8 +1443,8 @@ class RoHandTestWindow(QMainWindow):
 
                     rohan_manager = None
                     try:
-                        # 使用当前配置中的协议类型（不在这里重新加载配置，避免窗口闪动）
-                        rohan_manager = RohanManager.ensure_global(int(getattr(self, "protocol_type", 0) or 0))
+                        # 统一从全局管理器获取，避免重复创建实例
+                        rohan_manager = self._get_manager()
                         if rohan_manager.create_client(port):
                             info = rohan_manager.get_device_info(port)
                             if info:
@@ -1497,15 +1495,16 @@ class RoHandTestWindow(QMainWindow):
     def get_time():
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    def _get_config_path(self) -> str:
-        # 项目内固定位置：AutotestPlatform/config/config.ini
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.normpath(os.path.join(current_dir, "..", "config", "config.ini"))
-
     def _load_protocol_from_config_file(self):
         """从 config.ini 读取协议并同步全局 RohanManager。"""
         self.protocol_type = RohanManager.read_protocol_type_from_config(self._config_path)
         RohanManager.ensure_global(self.protocol_type)
+
+    def _get_manager(self, refresh_protocol: bool = False):
+        """统一获取全局 manager，必要时先从配置刷新协议。"""
+        if refresh_protocol:
+            self._load_protocol_from_config_file()
+        return RohanManager.ensure_global(self.protocol_type)
 
     def _attach_project_log_handler(self):
         if not hasattr(self, "log_text_edit"):
