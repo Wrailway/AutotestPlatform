@@ -7,8 +7,8 @@ import sys
 import time
 import concurrent.futures
 from typing import List, Tuple
-from OHandSerialAPI import HAND_RESP_SUCCESS, HAND_PROTOCOL_UART, MAX_MOTOR_CNT, MAX_THUMB_ROOT_POS, MAX_FORCE_ENTRIES, OHandSerialAPI
-from can_interface import *
+from rohand.api.OHandSerialAPI import HAND_RESP_SUCCESS, HAND_PROTOCOL_UART, MAX_MOTOR_CNT, MAX_THUMB_ROOT_POS, MAX_FORCE_ENTRIES, OHandSerialAPI
+from rohand.api.can_interface import *
 
 # 设置日志级别为INFO，获取日志记录器实例
 logger = logging.getLogger(__name__)

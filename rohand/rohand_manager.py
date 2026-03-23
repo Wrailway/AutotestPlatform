@@ -4,14 +4,11 @@ import os
 import can
 import configparser
 import logging
-import sys
 
-from pymodbus.client import ModbusSerialClient
-from pymodbus import exceptions as modbus_exceptions
 import serial.tools.list_ports
 
-from can_client import CanClient
-from modbus_client import ModbusClient
+from rohand.api.modbus_client import ModbusClient
+from rohand.api.can_client import CanClient
 
 logger = logging.getLogger(__name__)
 
