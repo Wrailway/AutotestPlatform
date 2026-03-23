@@ -14,8 +14,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_AppTestWindow(object):
     def setupUi(self, AppTestWindow):
         AppTestWindow.setObjectName("AppTestWindow")
-        AppTestWindow.resize(1280, 800)
-        AppTestWindow.setStyleSheet("/* ================= 原有样式保持不变 (用于上半部分) ================= */\n"
+        AppTestWindow.resize(1600, 900)
+        AppTestWindow.setStyleSheet("\n"
 "QMainWindow {\n"
 "    background-color: #f0f2f5;\n"
 "}\n"
@@ -111,14 +111,18 @@ class Ui_AppTestWindow(object):
 "\n"
 "/* --- 进度条区域 --- */\n"
 "QProgressBar {\n"
-"    border: none;\n"
-"    background-color: #ebeef5;\n"
+"    border: 1px solid #c0c4cc;\n"
+"    background-color: #ffffff;\n"
 "    border-radius: 4px;\n"
 "    text-align: center;\n"
+"    color: #303133;\n"
+"    font-family: Arial;\n"
+"    font-size: 13px;\n"
 "}\n"
 "QProgressBar::chunk {\n"
-"    background-color: #409eff;\n"
-"    border-radius: 4px;\n"
+"    background-color: #9ec6fc;\n"
+"    border-radius: 3px;\n"
+"    margin: 1px;\n"
 "}\n"
 "/* 状态文字 */\n"
 "#label_status {\n"
@@ -334,15 +338,16 @@ class Ui_AppTestWindow(object):
         self.label_status.setObjectName("label_status")
         self.layout_prog_text.addWidget(self.label_status)
         self.label_percent = QtWidgets.QLabel(self.bottom_panel)
+        self.label_percent.setText("")
         self.label_percent.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_percent.setObjectName("label_percent")
         self.layout_prog_text.addWidget(self.label_percent)
         self.layout_progress.addLayout(self.layout_prog_text)
         self.progressBar = QtWidgets.QProgressBar(self.bottom_panel)
-        self.progressBar.setMinimumSize(QtCore.QSize(0, 8))
-        self.progressBar.setMaximumSize(QtCore.QSize(16777215, 8))
+        self.progressBar.setMinimumSize(QtCore.QSize(0, 26))
+        self.progressBar.setMaximumSize(QtCore.QSize(16777215, 26))
         self.progressBar.setProperty("value", 0)
-        self.progressBar.setTextVisible(False)
+        self.progressBar.setTextVisible(True)
         self.progressBar.setObjectName("progressBar")
         self.layout_progress.addWidget(self.progressBar)
         self.horizontalLayout_3.addLayout(self.layout_progress)
@@ -485,7 +490,6 @@ class Ui_AppTestWindow(object):
         self.pause_btn.setText(_translate("AppTestWindow", "暂停"))
         self.stop_btn.setText(_translate("AppTestWindow", "停止"))
         self.label_status.setText(_translate("AppTestWindow", "等待指令..."))
-        self.label_percent.setText(_translate("AppTestWindow", "0%"))
         self.stat_num_total.setProperty("class", _translate("AppTestWindow", "stat_number"))
         self.stat_num_total.setText(_translate("AppTestWindow", "0"))
         self.stat_lbl_total.setProperty("class", _translate("AppTestWindow", "stat_label"))

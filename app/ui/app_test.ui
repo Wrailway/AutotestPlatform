@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1280</width>
-    <height>800</height>
+    <width>1600</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -110,14 +110,18 @@ QTextEdit {
 
 /* --- 进度条区域 --- */
 QProgressBar {
-	border: none;
-	background-color: #ebeef5;
+	border: 1px solid #c0c4cc;
+	background-color: #ffffff;
 	border-radius: 4px;
 	text-align: center;
+	color: #303133;
+	font-family: Arial;
+	font-size: 13px;
 }
 QProgressBar::chunk {
-	background-color: #409eff;
-	border-radius: 4px;
+	background-color: #9ec6fc;
+	border-radius: 3px;
+	margin: 1px;
 }
 /* 状态文字 */
 #label_status {
@@ -605,7 +609,7 @@ p, li { white-space: pre-wrap; }
            <item>
             <widget class="QLabel" name="label_percent">
              <property name="text">
-              <string>0%</string>
+              <string></string>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -619,20 +623,20 @@ p, li { white-space: pre-wrap; }
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>8</height>
+             <height>26</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>16777215</width>
-             <height>8</height>
+             <height>26</height>
             </size>
            </property>
            <property name="value">
             <number>0</number>
            </property>
            <property name="textVisible">
-            <bool>false</bool>
+            <bool>true</bool>
            </property>
           </widget>
          </item>
