@@ -4,11 +4,19 @@ import os
 import can
 import configparser
 import logging
+import sys
 
+from pymodbus.client import ModbusSerialClient
+from pymodbus import exceptions as modbus_exceptions
 import serial.tools.list_ports
 
-from rohand.api.modbus_client import ModbusClient
-from rohand.api.can_client import CanClient
+from can_client import CanClient
+from modbus_client import ModbusClient
+from rohand_common import (
+    COL_PORT, COL_SOFTWARE_VERSION, COL_DEVICE_ID, COL_CONNECT_STATUS, COL_TEST_RESULT,
+    STATUS_CONNECTED_UI, STATUS_NOT_CONNECTED, STATUS_UNKNOWN_DEVICE, STATUS_READ_FAIL,
+    build_device_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +57,11 @@ def _detect_can_available_configs():
 _global_manager = None
 _config_cache_path = None
 _cached_protocol_type = None
+
+# 设备信息相关常量
+ROH_FW_VERSION = 1001  # 固件版本寄存器地址
+MAX_ID = 247
+SUCCESS = 0x00
 
 
 # ==============================
@@ -169,6 +182,20 @@ class RohanManager:
             logger.warning(f"释放全局管理器时断开连接异常：{e}")
         _global_manager = None
         logger.info("已释放全局 RohanManager")
+
+    # ---------------------------------------------------------------------------
+    # 工具函数
+    # ---------------------------------------------------------------------------
+    @staticmethod
+    def _ts():
+        """获取当前时间戳"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    @staticmethod
+    def fmt_log(message: str) -> str:
+        """格式化日志消息"""
+        return f"[{RohanManager._ts()}] {message}"
 
     def __init__(self, protocol_type):
         """
@@ -333,25 +360,8 @@ class RohanManager:
     # 获取软件版本号
     # ==============================
 
-    def get_firmware_version(self, id):
-        ROH_FW_VERSION = 1001  # 固件版本寄存器地址
-        SUCCESS = 0x00
-        sw_version = '无法获取软件版本'
-        if self.protocol_type == self.MODBUS_PROTOCOL:
-            response = self.mb_receive_data_from_device(address=ROH_FW_VERSION, count=2, slave=id)
-            if response is not None:
-                sw_version = self.convert_version_format(response)
-
-        else:
-            major, minor, revision = [0], [0], [0]
-            err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(id, major, minor,
-                                                                                                      revision, [])
-            if err == SUCCESS:
-                sw_version = f'v{major_get}.{minor_get}.{revision_get}'
-        return sw_version
-
-
     def convert_version_format(self, registers):
+        """转换版本格式"""
         if len(registers) >= 2:
             value1 = registers[0]
             value2 = registers[1]
@@ -362,45 +372,76 @@ class RohanManager:
         else:
             return "无法获取"
 
+    def get_firmware_version(self, id):
+        """获取固件版本"""
+        sw_version = '无法获取软件版本'
+        if self.protocol_type == self.MODBUS_PROTOCOL:
+            response = self.mb_receive_data_from_device(address=ROH_FW_VERSION, count=2, slave=id)
+            if response is not None:
+                sw_version = self.convert_version_format(response)
+        else:
+            major, minor, revision = [0], [0], [0]
+            err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(id, major, minor, revision, [])
+            if err == SUCCESS:
+                sw_version = f'v{major_get}.{minor_get}.{revision_get}'
+        return sw_version
+
     def get_device_info(self, port):
-        ROH_FW_VERSION = 1001  # 固件版本寄存器地址
-        MAX_ID = 247
-        SUCCESS = 0x00
-        STR_PORT = '端口号'
-        STR_SOFTWARE_VERSION = '软件版本'
-        STR_DEVICE_ID = '设备ID'
-        STR_CONNECT_STATUS = '连接状态'
-        STR_TEST_RESULT = '测试结果'
-        for id in range(2, MAX_ID):
+        """获取设备信息"""
+        connect_status = STATUS_CONNECTED_UI
+        for device_id in range(2, MAX_ID):
             if self.protocol_type == self.MODBUS_PROTOCOL:
-                response = self.mb_receive_data_from_device(ROH_FW_VERSION, 2, id)
+                response = self.mb_receive_data_from_device(ROH_FW_VERSION, 2, device_id)
                 if response is not None:
                     sw_version = self.convert_version_format(response)
-                    node_id = id
-                    connect_status = '已连接'
-                    return {
-                        STR_PORT: port,
-                        STR_SOFTWARE_VERSION: sw_version,
-                        STR_DEVICE_ID: node_id,
-                        STR_CONNECT_STATUS: connect_status,
-                        STR_TEST_RESULT: '--'
-                    }
+                    return build_device_info(
+                        port=port,
+                        sw_version=sw_version,
+                        device_id=device_id,
+                        connect_status=connect_status,
+                    )
             else:
                 major, minor, revision = [0], [0], [0]
-                err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(id, major, minor,
-                                                                                                      revision, [])
+                err, major_get, minor_get, revision_get = self.client.serialClient.HAND_GetFirmwareVersion(device_id, major, minor, revision, [])
                 if err == SUCCESS:
                     sw_version = f'V{major_get}.{minor_get}.{revision_get}'
-                    node_id = id
-                    connect_status = '已连接'
-                    return {
-                        STR_PORT: port,
-                        STR_SOFTWARE_VERSION: sw_version,
-                        STR_DEVICE_ID: node_id,
-                        STR_CONNECT_STATUS: connect_status,
-                        STR_TEST_RESULT: '--'
-                    }
+                    return build_device_info(
+                        port=port,
+                        sw_version=sw_version,
+                        device_id=device_id,
+                        connect_status=connect_status,
+                    )
         return None
+
+    def query_port_device_fields(self, port):
+        """查询端口设备字段"""
+        sw, dev_id, status = "-", "-", STATUS_NOT_CONNECTED
+        try:
+            if not self.create_client(port):
+                return sw, dev_id, status
+            info = self.get_device_info(port)
+            if info:
+                return (
+                    str(info.get(COL_SOFTWARE_VERSION, "-")),
+                    str(info.get(COL_DEVICE_ID, "-")),
+                    str(info.get(COL_CONNECT_STATUS, STATUS_CONNECTED_UI)),
+                )
+            try:
+                node_id = getattr(self, "node_id", 2)
+                ver = self.get_firmware_version(node_id)
+                if ver and "无法获取" not in ver:
+                    return str(ver), str(node_id), STATUS_CONNECTED_UI
+                return sw, dev_id, STATUS_UNKNOWN_DEVICE
+            except Exception:
+                return sw, dev_id, STATUS_UNKNOWN_DEVICE
+        except Exception:
+            return sw, dev_id, STATUS_READ_FAIL
+        finally:
+            try:
+                if self and getattr(self, "client", None):
+                    self.client.disconnect()
+            except Exception:
+                pass
 
 
 # ==============================
