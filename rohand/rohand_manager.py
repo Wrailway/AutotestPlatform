@@ -4,15 +4,11 @@ import os
 import can
 import configparser
 import logging
-import sys
-
-from pymodbus.client import ModbusSerialClient
-from pymodbus import exceptions as modbus_exceptions
 import serial.tools.list_ports
 
-from api.can_client import CanClient
-from api.modbus_client import ModbusClient
-from rohand_common import (
+from rohand.api.can_client import CanClient
+from rohand.api.modbus_client import ModbusClient
+from rohand.rohand_common import (
     COL_PORT, COL_SOFTWARE_VERSION, COL_DEVICE_ID, COL_CONNECT_STATUS, COL_TEST_RESULT,
     STATUS_CONNECTED_UI, STATUS_NOT_CONNECTED, STATUS_UNKNOWN_DEVICE, STATUS_READ_FAIL,
     build_device_info,
