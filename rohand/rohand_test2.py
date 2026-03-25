@@ -21,7 +21,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.uic import loadUi
 
-from rohand_manager import RohanManager
+from rohand.rohand_manager2 import RohanManager
 from theme_qss import cache_default_qss, apply_black_qss, apply_green_qss, apply_default_qss
 from rohand_logger import RoHandLogger
 
@@ -395,6 +395,9 @@ class RoHandTestWindow(QMainWindow):
         self.check_box_list = []
         self.script_loaded = False
         self.script_path = None
+        self.protocol_type = None
+        self.rohand_manager = None
+        self.client = None
 
         # ===== UI 必须先加载 =====
         base = os.path.dirname(os.path.abspath(__file__))
@@ -415,7 +418,7 @@ class RoHandTestWindow(QMainWindow):
     # 初始化入口
     # ------------------------------------------------------------------
     def init_all(self):
-        self._get_manager(refresh=True)
+        # self._get_manager(refresh=True)
         self._init_ui_widgets()
         cache_default_qss(self)
         self.bind_all_events()
@@ -424,6 +427,8 @@ class RoHandTestWindow(QMainWindow):
         rohand_logger.set_log_text_edit(self.log_text_edit)
         self._init_port_refresh_timers()
         self._init_test_thread_placeholder()
+        self.protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+        self.rohand_manager = RohanManager(self.protocol_type)
 
     # ------------------------------------------------------------------
     # 端口刷新
@@ -444,7 +449,7 @@ class RoHandTestWindow(QMainWindow):
         self.test_thread = TestThread(
             TestRunParams(
                 ports=[],
-                manager=self._get_manager(),
+                # manager=self._get_manager(),
                 script=None,
                 aging="0.5小时",
             ),
@@ -982,13 +987,13 @@ class RoHandTestWindow(QMainWindow):
         self.fail_case_value.setText(f"{fail}条")
         self.skip_case_value.setText(f"{skip}条")
 
-    def _query_port_device_fields(self, port):
-        try:
-            mgr = self._get_manager()
-            return mgr.query_port_device_fields(port)
-        except Exception as e:
-            self.log(f"读取设备信息失败：{str(e)}")
-            return "-", "-", STATUS_READ_FAIL
+    # def _query_port_device_fields(self, port):
+    #     try:
+    #         mgr = self._get_manager()
+    #         return mgr.query_port_device_fields(port)
+    #     except Exception as e:
+    #         self.log(f"读取设备信息失败：{str(e)}")
+    #         return "-", "-", STATUS_READ_FAIL
 
     def _write_test_data_row(self, row, values):
         for col, text in enumerate(values):
@@ -1040,15 +1045,15 @@ class RoHandTestWindow(QMainWindow):
         except Exception as e:
             self.log(f"更新测试数据表格失败：{str(e)}")
 
-    def _get_manager(self, refresh=False):
-        if refresh:
-            self.protocol_type = RohanManager.read_protocol_type_from_config(
-                self._config_path
-            )
-            self.log(
-                f"从配置文件读取协议类型：{self.protocol_type}（0=Modbus，1=CAN）"
-            )
-        return RohanManager.ensure_global(self.protocol_type)
+    # def _get_manager(self, refresh=False):
+    #     if refresh:
+    #         self.protocol_type = RohanManager.read_protocol_type_from_config(
+    #             self._config_path
+    #         )
+    #         self.log(
+    #             f"从配置文件读取协议类型：{self.protocol_type}（0=Modbus，1=CAN）"
+    #         )
+    #     return RohanManager.ensure_global(self.protocol_type)
 
 
 
@@ -1056,7 +1061,7 @@ class RoHandTestWindow(QMainWindow):
         if self.test_thread.isRunning():
             self.test_thread.stop()
             self.test_thread.wait()
-        RohanManager.release_global()
+        # RohanManager.release_global()
         event.accept()
 
     def _restart_application(self):

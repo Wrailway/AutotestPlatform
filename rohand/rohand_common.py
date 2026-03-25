@@ -57,6 +57,8 @@ DEFAULT_AGING_OPTIONS = [
 REFRESH_PROMPT_DELAY_MS = 450
 
 
+
+
 def build_device_info(port, sw_version, device_id, connect_status, test_result=DEFAULT_TEST_RESULT):
     """统一构建设备信息字典，供 manager/UI 复用。"""
     return {
