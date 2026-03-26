@@ -44,6 +44,7 @@ class RoHandTestWindow(QMainWindow):
         self.protocol_type = 0
         self.select_port_names = []
         self.port_names = ['无可用端口']
+        self.selected_aging_hours = 0.001
         self.test_data_table = None
         self.check_box_list = []
         self.script_loaded = False
@@ -122,6 +123,7 @@ class RoHandTestWindow(QMainWindow):
     # 组件事件绑定
     # ------------------------------------------------------------------
     def _bind_all_events(self):
+        self.aging_time_combo.currentTextChanged.connect(self.on_aging_time_selected)
         self.log_copy_btn.clicked.connect(self.on_copy_log)
         self.log_clear_btn.clicked.connect(self.on_clear_log)
         self.log_save_btn.clicked.connect(self.on_save_log)
@@ -167,6 +169,14 @@ class RoHandTestWindow(QMainWindow):
     # ------------------------------------------------------------------
     # 控件响应函数
     # ------------------------------------------------------------------
+    def on_aging_time_selected(self, text):
+        try:
+            hour_value = float(text.replace("小时", ""))
+            self.rologger.log(f"已选择老化时间：{text} → 提取数字：{hour_value} 小时")
+            self.selected_aging_hours = hour_value
+        except Exception as e:
+            self.rologger.log(f"选择时间异常：{e}")
+
     def on_copy_log(self):
         self.rologger.log('on_copy_log')
         self.log_text_edit.selectAll()
@@ -272,7 +282,7 @@ class RoHandTestWindow(QMainWindow):
         self.rologger.log('on_port_cbx_clicked')
         try:
             port = checkbox.text()
-            self.select_port_names = self.port_names.copy() if checked else []
+            # self.select_port_names = self.port_names.copy() if checked else []
             if checked and port not in self.select_port_names:
                 self.select_port_names.append(port)
             elif not checked and port in self.select_port_names:
