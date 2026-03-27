@@ -322,6 +322,42 @@ class RoHandTestWindow(QMainWindow):
                 return row
         return -1
 
+    def _update_local_device_list(self, device_info_list,checked):
+        self.rologger.log('_update_local_device_list')
+        if not device_info_list:
+            return
+
+        try:
+            if checked:
+                # ---------------
+                # 新增：追加进去（不重复）
+                # ---------------
+                for new_dev in device_info_list:
+                    port = new_dev.get(COL_PORT)
+                    # 已存在就跳过，不重复添加
+                    exist = any(d.get(COL_PORT) == port for d in self.device_info_list)
+                    if not exist:
+                        self.device_info_list.append(new_dev)
+                        self.rologger.log(f"新增设备: {port}")
+            else:
+                # ---------------
+                # 移除：删除对应端口
+                # ---------------
+                for del_dev in device_info_list:
+                    port = del_dev.get(COL_PORT)
+                    # 过滤掉要删除的
+                    self.device_info_list = [
+                        d for d in self.device_info_list
+                        if d.get(COL_PORT) != port
+                    ]
+                    self.rologger.log(f"移除设备: {port}")
+
+            self.rologger.log(f"更新后本地设备列表: {self.device_info_list}")
+
+        except Exception as e:
+            self.rologger.log(f"更新设备列表异常: {str(e)}")
+            return
+
     def _on_device_info_update(self, device_info_list, checked):
         self.rologger.log('_on_device_info_update')
         self.rologger.log(f'设备信息列表: {device_info_list}')
@@ -329,8 +365,8 @@ class RoHandTestWindow(QMainWindow):
         if  not device_info_list:
             return
 
-        self.device_info_list.clear()
-        self.device_info_list = device_info_list
+        # self.device_info_list.clear()
+        self._update_local_device_list(device_info_list, checked)
 
         # 遍历所有设备信息（批量处理）
         for device_info in device_info_list:
