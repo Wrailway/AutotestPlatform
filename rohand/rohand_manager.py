@@ -31,6 +31,7 @@ class RohanManager:
     # _instance = None
     port = None
     device_id = None
+    MAX_ID = 247
 
     # ==============================
     # 单例模式
@@ -290,7 +291,7 @@ class RohanManager:
         connect_status = STATUS_CONNECTED_UI
 
         # 遍历设备ID（2~MAX_ID）
-        for device_id in range(2, MAX_ID):
+        for device_id in range(2, self.MAX_ID):
             try:
                 if self.protocol_type == self.MODBUS_PROTOCOL:
                     response = self.mb_read_register(self.ROH_FW_VERSION, 2, device_id)
@@ -358,7 +359,7 @@ if __name__ == "__main__":
         create_ok = modbus_manager.create_client(test_modbus_port)
         print(f"创建 Modbus 客户端: {'成功' if create_ok else '失败'}")
         if create_ok:
-            read_data = modbus_manager.mb_read_register(address=ROH_FW_VERSION, count=2, device_id=2)
+            read_data = modbus_manager.mb_read_register(address=1001, count=2, device_id=2)
             print(f"读固件版本寄存器返回数据: {read_data}")
             fw_version = modbus_manager.get_firmware_version(device_id=2)
             print(f"获取固件版本: {fw_version}")
