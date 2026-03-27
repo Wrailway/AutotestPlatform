@@ -124,7 +124,7 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
     end_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     logger.info(f'------------------- 测试结束：{final_result} <{end_time_str}> -------------------\n')
     print_overall_result(overall_result)
-    return test_title, description, overall_result, final_result
+    return test_title, overall_result
 
 
 def print_overall_result(overall_result):
@@ -158,7 +158,7 @@ def test_single_port(port, device_id):
 
         # 展开
         if aging.do_gesture(aging.initial_gesture[0]) and aging.do_gesture(aging.initial_gesture[1]):
-            # time.sleep(1)
+            time.sleep(1)
             if not aging.judge_if_hand_broken(aging.initial_gesture[1]):
                 res = build_gesture_result(ts, currents, "通过", "无")
             else:

@@ -507,9 +507,9 @@ class RoHandTestWindow(QMainWindow):
         self.status_bar.showMessage("测试已完成")
         self.rologger.log("老化测试时间到，自动结束")
 
-    def _on_script_finished_result(self, titles, result, flag):
+    def _on_script_finished_result(self, titles, result):
         self.rologger.log(f'_on_script_finished_result')
-        self.rologger.log(f'titles = {titles},result = {result},flag = {flag}')
+        self.rologger.log(f'titles = {titles},result = {result}')
 
         # 1. 解析所有数据
         port_data_dict = self.parse_test_result(result)
@@ -521,7 +521,7 @@ class RoHandTestWindow(QMainWindow):
 
             # 轮询查找：只要有一条不通过，整体就是不通过
             for row_data in table_rows:
-                test_result = row_data[4]
+                test_result = row_data[3]
                 if test_result != "通过":
                     final_result = "不通过"
                     break  # 找到就立刻退出，不用继续查
@@ -550,7 +550,6 @@ class RoHandTestWindow(QMainWindow):
                 table_row = (
                     gesture['timestamp'],  # 时间戳
                     gesture['description'],  # 描述
-                    gesture['expected'],  # 预期值
                     gesture['content'],  # 内容
                     gesture['result'],  # 测试结果
                     gesture['comment']  # 备注
@@ -648,7 +647,7 @@ class DeviceInfoWorker(QThread):
 # 定义执行测试脚本任务线程，执行完成后，脚本会返回测试结果
 class ExecuteScriptWorker(QThread):
     # 修正信号：用例描述、结果列表、执行标记（True=成功 False=失败）
-    finished_with_script_result = pyqtSignal(str, list, bool)  # 3个参数
+    finished_with_script_result = pyqtSignal(str, list)  # 3个参数
 
     def __init__(self, ports: list, device_ids: list,aging_duration: float, script_path: str, parent=None):
         super().__init__(parent)
@@ -662,7 +661,7 @@ class ExecuteScriptWorker(QThread):
         try:
             # 1. 检查脚本
             if not os.path.exists(self.script_path):
-                self.finished_with_script_result.emit("脚本不存在", [], False, False)
+                self.finished_with_script_result.emit("脚本不存在", [])
                 return
 
             if not self.ports:
@@ -680,17 +679,17 @@ class ExecuteScriptWorker(QThread):
             module = __import__(script_name)
 
             # 5. 【核心】像你原来一样调用 main 函数
-            report_title, overall_result, need_show_current = module.main(
+            report_title, overall_result = module.main(
                 ports=self.ports,
-                node_ids=self.device_ids,
+                devices_ids=self.device_ids,
                 aging_duration=self.aging_duration
             )
 
             # 6. 发射结果（完全匹配你的返回值）
-            self.finished_with_script_result.emit(report_title, overall_result, need_show_current)
+            self.finished_with_script_result.emit(report_title, overall_result)
 
         except Exception as e:
-            self.finished_with_script_result.emit(f"执行异常：{str(e)}", [], False)
+            self.finished_with_script_result.emit(f"执行异常：{str(e)}", [])
 
 
 class ProgressBarWorker(QThread):
