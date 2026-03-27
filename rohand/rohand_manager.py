@@ -10,7 +10,6 @@ from rohand.api.OHandSerialAPI import HAND_RESP_SUCCESS
 from rohand.api.can_client import CanClient
 from rohand.api.modbus_client import ModbusClient
 from rohand.rohand_common import STATUS_CONNECTED_UI, build_device_info
-from rohand.rohand_manager2 import MAX_ID, ROH_FW_VERSION
 
 # 修复日志引用错误
 logger = logging.getLogger(__name__)
