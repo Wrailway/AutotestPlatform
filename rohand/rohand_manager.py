@@ -249,19 +249,48 @@ class RohanManager:
                         sw_version = f'V{major_get}.{minor_get}.{revision_get}'
                 else:
                     logger.warning("CAN serialClient未初始化，使用模拟版本号")
-                    sw_version = "V3.1.151"  # 模拟有效版本号
+                    sw_version = "--"  # 模拟有效版本号
             except Exception as e:
                 logger.warning(f"获取CAN固件版本失败，使用模拟值：{e}")
-                sw_version = "V3.1.151"
+                sw_version = "--"
         return sw_version
 
     def get_device_info(self, port):
-        """获取设备信息，优化容错逻辑"""
+        return self._get_single_port_device_info(port)
+
+    def get_device_info_list(self, port_list):
+        """
+        【批量】获取多个端口的设备信息
+        :param port_list: 端口列表，例如 ["COM3", "COM5", "PCAN_USBBUS1"]
+        :return: 设备信息列表 [info1, info2, ...]
+        """
+        device_info_list = []
+
+        for port in port_list:
+            try:
+                # 单个端口获取设备信息
+                info = self._get_single_port_device_info(port)
+                if info:
+                    device_info_list.append(info)
+                    logger.info(f"【成功】{port} -> ID:{info['device_id']} 版本:{info['sw_version']}")
+                else:
+                    logger.warning(f"【无设备】{port}")
+            except Exception as e:
+                logger.error(f"【异常】{port} 获取信息失败：{str(e)}")
+
+        return device_info_list
+
+    def _get_single_port_device_info(self, port):
+        """
+        【内部】获取单个端口的设备信息（你原来的逻辑，我只微调）
+        """
         if not self.create_client(port):
             logger.error(f"无法连接端口 {port}，获取设备信息失败")
             return None
 
         connect_status = STATUS_CONNECTED_UI
+
+        # 遍历设备ID（2~MAX_ID）
         for device_id in range(2, MAX_ID):
             try:
                 if self.protocol_type == self.MODBUS_PROTOCOL:
@@ -284,8 +313,10 @@ class RohanManager:
                             connect_status=connect_status,
                         )
             except Exception as e:
-                logger.debug(f"检测设备ID {device_id} 失败：{e}")
+                logger.debug(f"端口 {port} 检测设备ID {device_id} 失败：{e}")
                 continue
+
+        # 遍历完所有ID都没找到
         return None
 
 # ==============================

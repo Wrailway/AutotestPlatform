@@ -53,6 +53,9 @@ class RoHandTestWindow(QMainWindow):
         self.rohand_manager = None
         self.roHandLogger = None
         self.client = None
+        self.total_test_seconds = 0
+        self.device_info_list = []
+        self.script_name = None
 
         # 加载UI xml文件
         base = os.path.dirname(os.path.abspath(__file__))
@@ -287,19 +290,29 @@ class RoHandTestWindow(QMainWindow):
                 self.select_port_names.append(port)
             elif not checked and port in self.select_port_names:
                 self.select_port_names.remove(port)
-            self.update_test_data_table(port, checked)
+            self.update_test_datas_table([port], checked)
             self.rologger.log(f"端口 {port} {'选中' if checked else '取消选中'}，已选：{self.select_port_names}")
         except Exception as e:
             self.rologger.log(f"复选框操作失败：{str(e)}")
 
-    def update_test_data_table(self, port, checked):
-        self.rologger.log('update_test_data_table')
-        self.deviceInfoWorker = DeviceInfoWorker(port)
+    # def update_test_data_table(self, port, checked):
+    #     self.rologger.log('update_test_data_table')
+    #     self.deviceInfoWorker = DeviceInfoWorker(port)
+    #     self.deviceInfoWorker.result_ready.connect(
+    #         lambda device_info: self._on_device_info_update(device_info, checked)
+    #     )
+    #     self.deviceInfoWorker.finished.connect(self.deviceInfoWorker.deleteLater)
+    #     self.deviceInfoWorker.start()
+
+    def update_test_datas_table(self, ports, checked):
+        self.rologger.log('update_test_datas_table')
+        self.deviceInfoWorker = DeviceInfoWorker(ports)
         self.deviceInfoWorker.result_ready.connect(
-            lambda device_info: self._on_device_info_update(device_info, checked)
+            lambda device_info_list: self._on_device_info_update(device_info_list, checked)
         )
         self.deviceInfoWorker.finished.connect(self.deviceInfoWorker.deleteLater)
         self.deviceInfoWorker.start()
+
 
     def get_row_by_port(self, port):
         """根据端口查找表格行号"""
@@ -309,46 +322,47 @@ class RoHandTestWindow(QMainWindow):
                 return row
         return -1
 
-    def _on_device_info_update(self, device_info, checked):
+    def _on_device_info_update(self, device_info_list, checked):
         self.rologger.log('_on_device_info_update')
-        self.rologger.log(f'device_info = {device_info}')
+        self.rologger.log(f'设备信息列表: {device_info_list}')
         self.rologger.log(f'勾选状态: {checked}')
-
-        port = device_info.get(COL_PORT)
-        if not port:
+        if  not device_info_list:
             return
 
-        # ==============================================
-        # 根据 checked 状态：勾选=添加/更新，取消=删除行
-        # ==============================================
-        if checked:
-            row = self.get_row_by_port(port)
-            if row < 0:
-                self.rologger.log(f'不存在 → 新增行')
-                row = self.test_data_table.rowCount()
-                self.test_data_table.insertRow(row)
+        self.device_info_list.clear()
+        self.device_info_list = device_info_list
 
-            # 填充数据（按你的表格列顺序）
-            self.test_data_table.setItem(row, 0, QTableWidgetItem(port))
-            self.test_data_table.setItem(row, 1, QTableWidgetItem(device_info.get(COL_SOFTWARE_VERSION, "")))
-            self.test_data_table.setItem(row, 2, QTableWidgetItem(str(device_info.get(COL_DEVICE_ID, ""))))
-            self.test_data_table.setItem(row, 3, QTableWidgetItem(device_info.get(COL_CONNECT_STATUS, "")))
-            self.test_data_table.setItem(row, 4, QTableWidgetItem(device_info.get(COL_TEST_RESULT, "")))
+        # 遍历所有设备信息（批量处理）
+        for device_info in device_info_list:
+            port = device_info.get(COL_PORT)
+            if not port:
+                continue
 
-        else:
-            self.rologger.log(f'直接删除这一行')
-            row = self.get_row_by_port(port)
-            if row >= 0:
-                self.test_data_table.removeRow(row)
-                self.rologger.log(f"已删除端口 {port} 的表格行")
+            # ==============================================
+            # 根据 checked 状态：勾选=添加/更新，取消=删除行
+            # ==============================================
+            if checked:
+                row = self.get_row_by_port(port)
+                if row < 0:
+                    self.rologger.log(f'端口 {port} 不存在 → 新增行')
+                    row = self.test_data_table.rowCount()
+                    self.test_data_table.insertRow(row)
+
+                # 填充真实数据
+                self.test_data_table.setItem(row, 0, QTableWidgetItem(port))
+                self.test_data_table.setItem(row, 1, QTableWidgetItem(device_info.get(COL_SOFTWARE_VERSION, "")))
+                self.test_data_table.setItem(row, 2, QTableWidgetItem(str(device_info.get(COL_DEVICE_ID, ""))))
+                self.test_data_table.setItem(row, 3, QTableWidgetItem(device_info.get(COL_CONNECT_STATUS, "")))
+                self.test_data_table.setItem(row, 4, QTableWidgetItem(device_info.get(COL_TEST_RESULT, "待测试")))
+
+            else:
+                self.rologger.log(f'删除端口 {port} 所在行')
+                row = self.get_row_by_port(port)
+                if row >= 0:
+                    self.test_data_table.removeRow(row)
+                    self.rologger.log(f"已删除端口 {port} 的表格行")
 
     def update_table_column_by_port(self, port, column_index, value):
-        """
-        根据端口号，只更新表格中指定的某一列
-        :param port: 端口号（如 PCAN_USBBUS1）
-        :param column_index: 要更新的列索引（0=端口,1=版本,2=设备ID,3=连接状态,4=测试结果）
-        :param value: 要更新的值（会自动转字符串）
-        """
         row = self.get_row_by_port(port)
         if row >= 0:
             # 更新指定单元格
@@ -382,6 +396,7 @@ class RoHandTestWindow(QMainWindow):
     def start_port_refresh(self):
         self.rologger.log(f'start_port_refresh')
         self.set_controls_enabled(False)
+        self.port_names.clear()
         self.port_refresh_worker  = PortRefreshWorker()
         self.port_refresh_worker.finished_with_ports.connect(self._on_port_refresh_finished)
         self.port_refresh_worker.start()
@@ -398,14 +413,63 @@ class RoHandTestWindow(QMainWindow):
                 cbx.blockSignals(True)
                 cbx.setChecked(checked)
                 cbx.blockSignals(False)
-                self.update_test_data_table(cbx.text(), checked)
+            if checked:
+                self.select_port_names = self.port_names.copy()
+            else:
+                self.select_port_names = []
+            self.update_test_datas_table(self.port_names, checked)
+
+    def get_device_ids(self, device_info_list):
+        device_ids = []
+        if not device_info_list:
+            return device_ids
+
+        for info in device_info_list:
+            dev_id = info.get(COL_DEVICE_ID)
+            if dev_id is not None and dev_id != "":
+                # 严格按列表顺序添加
+                device_ids.append(int(dev_id))
+
+        return device_ids
 
     def on_start_test(self):
-        self.rologger.log(f'on_start_test')
-        self.rologger.log(f"【检查】script_name = {self.script_name}")
-        self.executeScriptWorker = ExecuteScriptWorker(['PCAN_USBBUS1'],[2],0.005,self.script_name)
+        self.rologger.log('on_start_test')
+        self.rologger.log(f"script_name = {self.script_name}")
+        if not self.select_port_names:
+            self.status_bar.showMessage(f"请选择要测试的端口")
+            return
+        if not self.script_name:
+            self.status_bar.showMessage(f"请选择测试脚本")
+            return
+
+        # 1. 启动脚本执行线程
+        self.selected_device_ids  = self.get_device_ids(self.device_info_list)
+        self.executeScriptWorker = ExecuteScriptWorker(self.select_port_names, self.selected_device_ids, self.selected_aging_hours, self.script_name)
         self.executeScriptWorker.finished_with_script_result.connect(self._on_script_finished_result)
         self.executeScriptWorker.start()
+
+        # 2. 读取老化时间
+        self.total_test_seconds = self.selected_aging_hours * 3600
+
+        # 3. 进度条初始化
+        self.test_progress_bar.setRange(0, 100)
+        self.test_progress_bar.setValue(0)
+
+        # 4. 创建并启动进度条线程
+        self.progressbar_worker = ProgressBarWorker(duration=self.total_test_seconds)
+        self.progressbar_worker.progress_update.connect(self._on_progress_result)
+        self.progressbar_worker.finished_signal.connect(self.on_test_finished_auto)
+        self.progressbar_worker.start()  # <--- 这里必须是 start()
+
+        self.status_bar.showMessage("开始测试...")
+
+    def _on_progress_result(self, value):
+        """更新UI进度条"""
+        self.test_progress_bar.setValue(value)
+
+    def on_test_finished_auto(self):
+        self.status_bar.showMessage("测试已完成")
+        self.rologger.log("老化测试时间到，自动结束")
 
     def _on_script_finished_result(self, titles, result, flag):
         self.rologger.log(f'_on_script_finished_result')
@@ -433,11 +497,6 @@ class RoHandTestWindow(QMainWindow):
             self.rologger.log(f"端口 {port} 最终测试结果：{final_result}")
 
     def parse_test_result(self, result):
-        """
-        从测试结果中解析数据，按端口分组整理，用于刷新表格
-        :param result: 原始测试结果数据（对应原代码的 overall_result）
-        :return: 按端口分组的字典 {端口号: [(时间戳, 描述, 预期值, 内容, 结果, 备注), ...]}
-        """
         self.rologger.log('开始解析测试结果数据，用于表格刷新')
 
         # 最终返回的按端口分组的字典
@@ -535,18 +594,18 @@ class PortRefreshWorker(QThread):
 
 # 定义设备信息获取任务线程
 class DeviceInfoWorker(QThread):
-     result_ready = pyqtSignal(dict)
+     result_ready = pyqtSignal(list)
 
-     def __init__(self, port, parent=None):
+     def __init__(self, ports, parent=None):
          super().__init__(parent)
-         self.port = port
+         self.ports = ports
 
      def run(self):
          try:
              DEFAULT_TEST_RESULT = 0
              protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
-             device_info = RohanManager(protocol_type).get_device_info(self.port)
-             self.result_ready.emit(device_info)
+             device_infos = RohanManager(protocol_type).get_device_info_list(self.ports)
+             self.result_ready.emit(device_infos)
          except Exception as e:
              self.result_ready.emit(str(e))
 
@@ -568,6 +627,9 @@ class ExecuteScriptWorker(QThread):
             # 1. 检查脚本
             if not os.path.exists(self.script_path):
                 self.finished_with_script_result.emit("脚本不存在", [], False, False)
+                return
+
+            if not self.ports:
                 return
 
             # 2. 获取脚本目录，加入环境变量（能 import）
@@ -594,6 +656,44 @@ class ExecuteScriptWorker(QThread):
         except Exception as e:
             self.finished_with_script_result.emit(f"执行异常：{str(e)}", [], False)
 
+
+class ProgressBarWorker(QThread):
+    progress_update = pyqtSignal(int)
+    finished_signal = pyqtSignal()
+
+    def __init__(self, duration, parent=None):
+        super().__init__(parent)
+        self.total_test_seconds = duration  # 总时长（秒）
+        self.is_running = True
+        self.is_paused = False
+
+    def run(self):
+        start_time = time.time()
+        while self.is_running:
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
+
+            elapsed = time.time() - start_time
+            progress = min(100, int((elapsed / self.total_test_seconds) * 100))
+            self.progress_update.emit(progress)
+
+            if progress >= 100:
+                break
+
+            time.sleep(0.5)
+
+        self.progress_update.emit(100)
+        self.finished_signal.emit()
+
+    def pause(self):
+        self.is_paused = True
+
+    def resume(self):
+        self.is_paused = False
+
+    def stop(self):
+        self.is_running = False
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
