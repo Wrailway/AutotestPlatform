@@ -521,7 +521,7 @@ class RoHandTestWindow(QMainWindow):
 
             # 轮询查找：只要有一条不通过，整体就是不通过
             for row_data in table_rows:
-                test_result = row_data[3]
+                test_result = row_data[2] #当前返回数据第三个数据为测试结果
                 if test_result != "通过":
                     final_result = "不通过"
                     break  # 找到就立刻退出，不用继续查
@@ -549,7 +549,6 @@ class RoHandTestWindow(QMainWindow):
                 # 组装表格需要的元组数据
                 table_row = (
                     gesture['timestamp'],  # 时间戳
-                    gesture['description'],  # 描述
                     gesture['content'],  # 内容
                     gesture['result'],  # 测试结果
                     gesture['comment']  # 备注

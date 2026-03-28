@@ -83,6 +83,13 @@ class Aging_test:
 
         return [round(total / valid_count, 2) for total in sum_currents]
 
+    def close(self):
+        try:
+            if self.rohan_manager:
+                self.rohan_manager.client.disconnect()
+        except:
+            pass
+
 
 def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
     test_title = '老化测试报告'
@@ -108,7 +115,7 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
             with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
                 futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]
                 for future in concurrent.futures.as_completed(futures):
-                    port_result, _ = future.result()
+                    port_result = future.result()
                     round_results.append(port_result)
                     for g in port_result["gestures"]:
                         if g["result"] != "通过":
@@ -138,11 +145,11 @@ def print_overall_result(overall_result):
         logger.info(f'Port: {port}')
         for g in gestures:
             logger.info(
-                f'[{g["timestamp"]}] {g["description"]} | 电流：{g["content"]} | 结果：{g["result"]} | 备注：{g["comment"]}')
+                f'[测试时间：{g["timestamp"]}] | 电流：{g["content"]} | 测试结果：{g["result"]} | 备注：{g["comment"]}')
 
 
 def test_single_port(port, device_id):
-    protocol_type = RohanManager.read_config_value("protocol_type", "protocol", 0)
+    protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
     aging = Aging_test(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -154,31 +161,31 @@ def test_single_port(port, device_id):
             logger.info(f'[{port}] 抓握完成，电流：{currents}')
         else:
             port_result["gestures"].append(build_gesture_result(ts, "", "不通过", "执行失败"))
-            return port_result, True
+            return port_result
 
-        # 展开
+        # 展开,并判断手指有没有异常(如无法回到初始位置)
         if aging.do_gesture(aging.initial_gesture[0]) and aging.do_gesture(aging.initial_gesture[1]):
             time.sleep(1)
             if not aging.judge_if_hand_broken(aging.initial_gesture[1]):
                 res = build_gesture_result(ts, currents, "通过", "无")
             else:
-                res = build_gesture_result(ts, "", "不通过", "手指脱线")
+                res = build_gesture_result(ts, "", "不通过", "手指异常，无法归位(或脱线）")
         else:
-            res = build_gesture_result(ts, "", "不通过", "执行失败")
+            res = build_gesture_result(ts, "", "不通过", "命令执行失败，请查看手是否连接异常")
 
         port_result["gestures"].append(res)
 
     except Exception as e:
         port_result["gestures"].append(build_gesture_result(ts, "", "不通过", f"异常：{e}"))
-
-    logger.info(f'[{port}] 测试完成')
-    return port_result, True
+    finally:
+        aging.close()
+    # logger.info(f'[{port}] 测试完成')
+    return port_result
 
 
 def build_gesture_result(timestamp, content, result, comment):
     return {
         "timestamp": timestamp,
-        "description": "抓握老化测试",
         "content": content,
         "result": result,
         "comment": comment
@@ -186,4 +193,4 @@ def build_gesture_result(timestamp, content, result, comment):
 
 
 if __name__ == "__main__":
-    main(ports=['PCAN_USBBUS1', 'PCAN_USBBUS2'], devices_ids=[2, 2], aging_duration=0.01)
+    main(ports=['PCAN_USBBUS1'], devices_ids=[2], aging_duration=0.01)
