@@ -44,7 +44,8 @@ class RoHandTestWindow(QMainWindow):
         self.protocol_type = 0
         self.select_port_names = []
         self.port_names = ['无可用端口']
-        self.selected_aging_hours = 0.001
+        self.selected_aging_hours = 0.01
+        self.unit_duration = 6.16
         self.test_data_table = None
         self.check_box_list = []
         self.script_loaded = False
@@ -468,6 +469,29 @@ class RoHandTestWindow(QMainWindow):
 
         return device_ids
 
+    def get_offset_duration(self):
+        self.rologger.log(f'get_offset_duration')
+        value = float(RohanManager.read_config_value(
+            section="aging_parameter",
+            key="unit_duration",
+            default=0
+        ))
+        self.unit_duration = float(str(value).strip())
+
+        if  self.unit_duration <= 0:
+            return 0.0
+
+        # 计算总周期数
+        total_seconds = float(self.selected_aging_hours) * 3600
+        total_cycles = total_seconds /  self.unit_duration
+
+        # 计算补时时长（补齐到整数周期）
+        decimal_part = total_cycles - int(total_cycles)
+        offset_seconds = round((1 - decimal_part) * self.unit_duration, 2)
+        self.rologger.log(f'offset_seconds = {offset_seconds}')
+
+        return offset_seconds
+
     def on_start_test(self):
         self.rologger.log('on_start_test')
         self.rologger.log(f"script_name = {self.script_name}")
@@ -478,14 +502,14 @@ class RoHandTestWindow(QMainWindow):
             self.status_bar.showMessage(f"请选择测试脚本")
             return
 
-        # 1. 启动脚本执行线程
+        # 1. 读取老化时间
+        self.total_test_seconds = self.selected_aging_hours * 3600 + self.get_offset_duration()
+
+        # 2. 启动脚本执行线程
         self.selected_device_ids  = self.get_device_ids(self.device_info_list)
         self.executeScriptWorker = ExecuteScriptWorker(self.select_port_names, self.selected_device_ids, self.selected_aging_hours, self.script_name)
         self.executeScriptWorker.finished_with_script_result.connect(self._on_script_finished_result)
         self.executeScriptWorker.start()
-
-        # 2. 读取老化时间
-        self.total_test_seconds = self.selected_aging_hours * 3600
 
         # 3. 进度条初始化
         self.test_progress_bar.setRange(0, 100)
@@ -697,7 +721,7 @@ class ProgressBarWorker(QThread):
 
     def __init__(self, duration, parent=None):
         super().__init__(parent)
-        self.total_test_seconds = duration  # 总时长（秒）
+        self.total_test_seconds = max(duration, 1)
         self.is_running = True
         self.is_paused = False
 
@@ -709,7 +733,10 @@ class ProgressBarWorker(QThread):
                 continue
 
             elapsed = time.time() - start_time
-            progress = min(100, int((elapsed / self.total_test_seconds) * 100))
+
+            progress = int((elapsed / self.total_test_seconds) * 100)
+            progress = max(0, min(100, progress))  # 限定 0~100
+
             self.progress_update.emit(progress)
 
             if progress >= 100:
