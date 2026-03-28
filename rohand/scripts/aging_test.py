@@ -38,7 +38,7 @@ class Aging_test:
     ROH_FINGER_POS_TARGET0 = 1135
     ROH_FINGER_CURRENT0 = 1105
     DEFAULT_SPEED = 255
-    aging_speed = 1
+    action_interval  = 1
 
     def __init__(self, protocol_type, port, device_id):
         self.protocol_type = protocol_type
@@ -48,7 +48,7 @@ class Aging_test:
         self.rohan_manager.create_client(port=port)
 
     def do_gesture(self, gesture):
-        time.sleep(self.aging_speed)
+        time.sleep(self.action_interval )
         return self.rohan_manager.setFingerPos(gesture=gesture, device_id=self.device_id)
 
     def judge_if_hand_broken(self, gesture):
@@ -87,13 +87,12 @@ class Aging_test:
         try:
             if self.rohan_manager:
                 self.rohan_manager.client.disconnect()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f'异常关闭端口{e}')
 
 
 def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
     test_title = '老化测试报告'
-    description = '重复抓握手势，记录电机电流 <单位：mA>'
     overall_result = []
     final_result = '通过'
     SECONDS_PER_HOUR = 3600
@@ -165,7 +164,7 @@ def test_single_port(port, device_id):
 
         # 展开,并判断手指有没有异常(如无法回到初始位置)
         if aging.do_gesture(aging.initial_gesture[0]) and aging.do_gesture(aging.initial_gesture[1]):
-            time.sleep(1)
+            time.sleep(Aging_test.action_interval)
             if not aging.judge_if_hand_broken(aging.initial_gesture[1]):
                 res = build_gesture_result(ts, currents, "通过", "无")
             else:
