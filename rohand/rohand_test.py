@@ -738,7 +738,7 @@ class RoHandTestWindow(QMainWindow):
 
         # ===================== 【唯一核心】安全写入数据 =====================
         row_index = 7
-        for item in raw_result:
+        for item in self.raw_test_data:
             try:
                 port = item["port"]
                 gestures = item["gestures"]
