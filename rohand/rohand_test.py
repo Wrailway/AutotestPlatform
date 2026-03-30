@@ -63,6 +63,8 @@ class RoHandTestWindow(QMainWindow):
         self.total_test_seconds = 0
         self.device_info_list = []
         self.script_name = None
+        self.report_title = None
+        self.raw_test_data = None
 
         # 加载UI xml文件
         base = os.path.dirname(os.path.abspath(__file__))
@@ -621,10 +623,15 @@ class RoHandTestWindow(QMainWindow):
 
     def on_export_report(self):
         self.rologger.log(f'on_export_report')
+        if self.raw_test_data is None or len(self.raw_test_data) == 0:
+            self.rologger.log("导出失败：无测试数据")
+            self.status_bar.showMessage(f"尚未进行测试，无数据可导出")
+            return
 
-        # 直接在这里处理原始数据，不依赖任何变量，彻底避免闪退
-        raw_result = self.raw_test_data  # 你日志里的真实数据
-        self.rologger.log(f"开始导出报告，原始数据长度: {len(raw_result)}")
+        if self.report_title is None or self.report_title.strip() == "":
+            self.rologger.log("导出失败：报告标题为空")
+            self.status_bar.showMessage(f"请设置报告标题")
+            return
         headers = ["用例编号", "时间戳", "内容", "测试结果", "备注", "端口号"]
         column_widths = [10, 25, 35, 12, 15, 18]
         default_row_height = 35
