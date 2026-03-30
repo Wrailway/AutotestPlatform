@@ -50,7 +50,7 @@ class RoHandTestWindow(QMainWindow):
         self.protocol_type = 0
         self.select_port_names = []
         self.port_names = ['无可用端口']
-        self.selected_aging_hours = 0.01
+        self.selected_aging_hours = 0.001
         self.unit_duration = 6.16
         self.test_data_table = None
         self.check_box_list = []
@@ -564,6 +564,64 @@ class RoHandTestWindow(QMainWindow):
 
             # 日志
             self.rologger.log(f"端口 {port} 最终测试结果：{final_result}")
+
+        self._update_test_result(self.raw_test_data)
+
+    def _update_test_result(self, raw_test_data):
+        self.rologger.log(f'_update_test_result')
+
+        # 1. 先把原始数据转成你熟悉的 port_data_dict 结构（不去重）
+        port_data_dict = {}
+        for item in raw_test_data:
+            port = item['port']
+            if port not in port_data_dict:
+                port_data_dict[port] = []
+            for gesture in item['gestures']:
+                # 组装成 row_data 结构：timestamp, content, result, comment
+                row_data = (
+                    gesture['timestamp'],
+                    gesture['content'],
+                    gesture['result'],
+                    gesture['comment']
+                )
+                port_data_dict[port].append(row_data)
+
+        # 2. 统计总数、成功数、失败数（完全按你的遍历方式）
+        total_count = 0
+        success_count = 0
+        failed_count = 0
+
+        # 3. 遍历每个端口 → 判断最终结果
+        for port, table_rows in port_data_dict.items():
+            # 默认：全部通过
+            final_result = "通过"
+
+            # 轮询查找：只要有一条不通过，整体就是不通过
+            for row_data in table_rows:
+                test_result = row_data[2]  # 当前返回数据第三个数据为测试结果
+                total_count += 1
+                if test_result == "通过":
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    final_result = "不通过"
+                    # 找到就立刻退出，不用继续查
+
+        # 4. 赋值给界面变量
+        self.rologger.log(f'total_count={total_count},success_count={success_count},failed_count={failed_count}')
+        self.total_case_value.setText(str(total_count))
+        self.success_case_value.setText(str(success_count))
+        self.fail_case_value.setText(str(failed_count))
+        # 5. 最终测试状态
+        if failed_count == 0 and total_count > 0:
+            self.test_status_label.setStyleSheet("color: #2E8B57; font-size:14px; font-weight:bold;")
+            self.test_status_label.setText("✅ 测试完成 | 全部用例通过")
+        elif total_count == 0:
+            self.test_status_label.setStyleSheet("color: #696969; font-size:14px;")
+            self.test_status_label.setText("⌛ 等待测试 | 暂无用例执行")
+        else:
+            self.test_status_label.setStyleSheet("color: #DC143C; font-size:14px; font-weight:bold;")
+            self.test_status_label.setText("❌ 测试完成 | 存在失败用例")
 
     def parse_test_result(self, result):
         self.rologger.log('开始解析测试结果数据，用于表格刷新')
