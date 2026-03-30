@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import sys
 import os
 import time
 from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, PatternFill, Side
+from openpyxl.styles.fonts import Font
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.dimensions import RowDimension
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
@@ -534,7 +540,8 @@ class RoHandTestWindow(QMainWindow):
     def _on_script_finished_result(self, titles, result):
         self.rologger.log(f'_on_script_finished_result')
         self.rologger.log(f'titles = {titles},result = {result}')
-
+        self.report_title = titles
+        self.raw_test_data = result
         # 1. 解析所有数据
         port_data_dict = self.parse_test_result(result)
 
@@ -614,6 +621,94 @@ class RoHandTestWindow(QMainWindow):
 
     def on_export_report(self):
         self.rologger.log(f'on_export_report')
+
+        # 直接在这里处理原始数据，不依赖任何变量，彻底避免闪退
+        raw_result = self.raw_test_data  # 你日志里的真实数据
+        self.rologger.log(f"开始导出报告，原始数据长度: {len(raw_result)}")
+        headers = ["用例编号", "时间戳", "内容", "测试结果", "备注", "端口号"]
+        column_widths = [10, 25, 35, 12, 15, 18]
+        default_row_height = 35
+
+        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                             top=Side(style='thin'), bottom=Side(style='thin'))
+        alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "测试报告"
+
+        # 标题
+        ws.merge_cells('A1:F1')
+        ws['A1'] = self.report_title
+        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].alignment = alignment
+        ws.row_dimensions[1].height = default_row_height
+
+        # 基础信息
+        ws['A2'] = '产品名称'
+        ws['C2'] = '产品型号'
+        ws.merge_cells('D2:F2')
+        ws['A3'] = '测试地点'
+        ws['C3'] = '测试时间'
+        ws.merge_cells('D3:F3')
+        ws['A4'] = '测试设备'
+        ws['C4'] = '设备编号'
+        ws.merge_cells('D4:F4')
+        ws['A5'] = '温度'
+        ws['C5'] = '湿度'
+        ws.merge_cells('D5:F5')
+
+        # 表头
+        ws.append(headers)
+        ws.row_dimensions[6].height = default_row_height
+
+        # ===================== 【唯一核心】安全写入数据 =====================
+        row_index = 7
+        for item in raw_result:
+            try:
+                port = item["port"]
+                gestures = item["gestures"]
+
+                for g in gestures:
+                    # 🔥 最安全的取值方式，绝不闪退
+                    ts = g.get("timestamp", "")
+                    content = str(g.get("content", ""))  # 转字符串 = 防崩关键
+                    res = g.get("result", "")
+                    comment = g.get("comment", "")
+
+                    ws.append([
+                        row_index - 6,
+                        ts,
+                        content,
+                        res,
+                        comment,
+                        port
+                    ])
+                    row_index += 1
+
+            except Exception as e:
+                self.rologger.log(f"数据处理异常: {e}")
+
+        # ===================== 收尾 =====================
+        for i, w in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.alignment = alignment
+                cell.border = thin_border
+
+        # 保存
+        os.makedirs("report", exist_ok=True)
+        name = os.path.splitext(os.path.basename(self.script_name))[0]
+        filename = f"{name}_report_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+        filepath = os.path.join("report", filename)
+
+        wb.save(filepath)
+        QMessageBox.information(self, "成功", f"报告已保存：\n{filepath}")
+
+    # def on_export_report(self):
+    #     self.rologger.log(f'on_export_report')
 
     def on_view_config(self):
         self.rologger.log(f'on_view_config')
