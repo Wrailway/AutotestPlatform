@@ -130,7 +130,7 @@ class RoHandTestWindow(QMainWindow):
 
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
-        self.test_progress_bar.setStyleSheet("QProgressBar { color: #FFFFFF; font-weight: bold; }")
+        self.test_progress_bar.setStyleSheet("QProgressBar { color: #000000; font-weight: bold; }")
 
 
         self.total_case_value.setText("0条")
