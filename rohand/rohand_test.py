@@ -14,7 +14,7 @@ from openpyxl.worksheet.dimensions import RowDimension
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox,
-    QDialog, QLabel, QProgressBar, QPushButton, QHBoxLayout
+    QDialog, QLabel, QProgressBar, QPushButton, QHBoxLayout,QStyledItemDelegate
 )
 
 from PyQt5.QtWidgets import QMenu, QAction
@@ -100,6 +100,11 @@ class RoHandTestWindow(QMainWindow):
                 font-size: 16px;         /* ✅ 字体大小（你要的） */
             }
         """)
+    # 表格内容居中，解决qproperty-alignment: AlignCenter 在部分 PyQt5 版本里就是不生效的bug
+    class CenterAlignDelegate(QStyledItemDelegate):
+        def initStyleOption(self, option, index):
+            super().initStyleOption(option, index)
+            option.displayAlignment = Qt.AlignCenter
 
     def _init_ui_widgets(self):
         self.setMenuItemStyle(self.menu_file)
@@ -118,11 +123,15 @@ class RoHandTestWindow(QMainWindow):
             QHeaderView.Stretch
         )
 
+        self.test_data_table.setItemDelegate(self.CenterAlignDelegate())
+
         self.aging_time_combo.clear()
         self.aging_time_combo.addItems(DEFAULT_AGING_OPTIONS)
 
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
+        self.test_progress_bar.setStyleSheet("QProgressBar { color: #FFFFFF; font-weight: bold; }")
+
 
         self.total_case_value.setText("0条")
         self.success_case_value.setText("0条")
@@ -399,7 +408,6 @@ class RoHandTestWindow(QMainWindow):
                 self.test_data_table.setItem(row, 2, QTableWidgetItem(str(device_info.get(COL_DEVICE_ID, ""))))
                 self.test_data_table.setItem(row, 3, QTableWidgetItem(device_info.get(COL_CONNECT_STATUS, "")))
                 self.test_data_table.setItem(row, 4, QTableWidgetItem(device_info.get(COL_TEST_RESULT, "待测试")))
-
             else:
                 self.rologger.log(f'删除端口 {port} 所在行')
                 row = self.get_row_by_port(port)
@@ -522,7 +530,6 @@ class RoHandTestWindow(QMainWindow):
         # 3. 进度条初始化
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
-        self.test_progress_bar.setStyleSheet("QProgressBar { color: #000000; font-weight: bold; }")
 
         # 4. 创建并启动进度条线程
         self.progressbar_worker = ProgressBarWorker(duration=self.total_test_seconds)
