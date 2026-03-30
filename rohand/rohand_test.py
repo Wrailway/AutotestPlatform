@@ -522,6 +522,7 @@ class RoHandTestWindow(QMainWindow):
         # 3. 进度条初始化
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
+        self.test_progress_bar.setStyleSheet("QProgressBar { color: #000000; font-weight: bold; }")
 
         # 4. 创建并启动进度条线程
         self.progressbar_worker = ProgressBarWorker(duration=self.total_test_seconds)
