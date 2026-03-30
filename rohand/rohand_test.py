@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+import subprocess
 import sys
 import os
 import time
@@ -14,7 +14,7 @@ from openpyxl.worksheet.dimensions import RowDimension
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox,
-    QDialog, QLabel, QProgressBar, QPushButton, QHBoxLayout,QStyledItemDelegate
+    QDialog, QLabel, QProgressBar, QPushButton, QHBoxLayout,QStyledItemDelegate,QTextEdit, QDialogButtonBox
 )
 
 from PyQt5.QtWidgets import QMenu, QAction
@@ -26,7 +26,8 @@ from PyQt5.uic import loadUi
 
 from rohand.rohand_logger import RoHandLogger
 from rohand.rohand_manager import RohanManager
-from theme_qss import cache_default_qss, apply_black_qss, apply_green_qss, apply_default_qss
+
+from rohand_theme import cache_default_qss, apply_black_qss, apply_green_qss, apply_default_qss
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ class RoHandTestWindow(QMainWindow):
     def _init_manager(self):
         print(f'_init_manager')
         self.rologger = RoHandLogger(self.log_text_edit)
-        self.protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+        self.protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
         self.rohand_manager = RohanManager(self.protocol_type)
 
         #延迟初始化
@@ -783,11 +784,198 @@ class RoHandTestWindow(QMainWindow):
     # def on_export_report(self):
     #     self.rologger.log(f'on_export_report')
 
+    # ========== 查看配置文件功能 ==========
     def on_view_config(self):
+        """
+        查看配置文件内容
+        功能：读取配置文件并以只读方式显示
+        """
         self.rologger.log(f'on_view_config')
+        
+        #  获取配置文件的完整路径
+        config_path = RohanManager.get_configfile_path()
+        
+        #  检查配置文件是否存在
+        if not os.path.exists(config_path):
+            QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
+            self.rologger.log(f"配置文件不存在：{config_path}")
+            return
+        
+        # 读取配置文件内容
+        try:
+            with open(config_path, 'r', encoding='UTF-8') as f:
+                config_content = f.read()  # 读取全部文本内容
+            
+            # 创建一个对话框窗口
+            dialog = QDialog(self)
+            dialog.setWindowTitle("查看配置文件")  # 设置窗口标题
+            dialog.setMinimumSize(600, 800)  # 设置最小尺寸：宽 600，高 800
+            
+            #  创建垂直布局（控件从上到下排列）
+            layout = QVBoxLayout()
+            
+            # 创建文本显示框（只读模式）
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)  # 设置为只读，不能编辑
+            text_edit.setFont(QFont("Consolas", 10))  # 设置等宽字体，方便查看
+            text_edit.setPlainText(config_content)  # 填入配置文件内容
 
+            # 设置文本框样式：白色背景，黑色文字，清晰可读
+            text_edit.setStyleSheet("""
+                            QTextEdit {
+                                background-color: white;
+                                color: #333333;
+                                border: 2px solid #d1d5db;
+                                border-radius: 6px;
+                                padding: 8px;
+                                font-size: 14px;
+                            }
+                        """)
+            #  创建按钮框（只有一个"OK"按钮）
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+            button_box.accepted.connect(dialog.accept)  # 点击确定后关闭对话框
+            
+            #  将控件添加到布局中
+            layout.addWidget(text_edit)  # 添加文本框
+            layout.addWidget(button_box)  # 添加按钮
+            
+            #  设置对话框的布局
+            dialog.setLayout(layout)
+            
+            # 显示对话框（模态窗口，等待用户关闭）
+            dialog.exec_()
+            
+            self.rologger.log(f"成功查看配置文件：{config_path}")
+            
+        except Exception as e:
+            # 如果读取失败，显示错误提示
+            QMessageBox.critical(self, "错误", f"读取配置文件失败：{str(e)}")
+            self.rologger.log(f"读取配置文件失败：{str(e)}")
+
+    # ========== 修改配置文件功能 ==========
     def on_edit_config(self):
+        """
+        修改配置文件内容
+        功能：读取配置文件并允许用户编辑，保存后自动重启应用
+        """
         self.rologger.log(f'on_edit_config')
+
+        # 获取配置文件的完整路径
+        config_path = RohanManager.get_configfile_path()
+
+        # 检查配置文件是否存在
+        if not os.path.exists(config_path):
+            QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
+            self.rologger.log(f"配置文件不存在：{config_path}")
+            return
+
+        # 读取配置文件内容
+        try:
+            with open(config_path, 'r', encoding='UTF-8') as f:
+                config_content = f.read()
+
+            # 创建对话框
+            dialog = QDialog(self)
+            dialog.setWindowTitle("修改配置文件")
+            dialog.setMinimumSize(600, 800)
+
+            # 创建布局
+            layout = QVBoxLayout()
+
+            # 创建提示标签
+            hint_label = QLabel("提示：修改后需要重启应用程序才能生效")
+            hint_label.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 5px;")
+            layout.addWidget(hint_label)
+
+            # 创建文本编辑框
+            text_edit = QTextEdit()
+            text_edit.setFont(QFont("Consolas", 10))
+            text_edit.setPlainText(config_content)
+
+            # 设置文本框样式：白色背景，黑色文字，清晰可读
+            text_edit.setStyleSheet("""
+                QTextEdit {
+                    background-color: white;
+                    color: #333333;
+                    border: 2px solid #d1d5db;
+                    border-radius: 6px;
+                    padding: 8px;
+                    font-size: 14px;
+                    }
+            """)
+
+            # 创建按钮框
+            button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+
+            # 绑定保存按钮
+            save_button = button_box.button(QDialogButtonBox.Save)
+            save_button.setText("保存")
+            save_button.clicked.connect(
+                lambda: self._save_config_and_restart(config_path, text_edit.toPlainText(), dialog)
+            )
+
+            # 绑定取消按钮
+            cancel_button = button_box.button(QDialogButtonBox.Cancel)
+            cancel_button.setText("取消")
+            cancel_button.clicked.connect(dialog.reject)
+
+            # 添加控件到布局
+            layout.addWidget(text_edit)
+            layout.addWidget(button_box)
+            dialog.setLayout(layout)
+
+            # 显示对话框
+            dialog.exec_()
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"编辑配置文件失败：{str(e)}")
+            self.rologger.log(f"编辑配置文件失败：{str(e)}")
+
+    # ========== 保存配置并重启 ==========
+    def _save_config_and_restart(self, config_path, content, dialog):
+        """
+        保存配置文件并重启应用程序
+
+        参数:
+            config_path: 配置文件路径
+            content: 配置文件内容
+            dialog: 当前对话框窗口
+        """
+        try:
+            #  保存配置文件
+            with open(config_path, 'w', encoding='UTF-8') as f:
+                f.write(content)
+
+            self.rologger.log(f"配置文件已保存：{config_path}")
+
+            #  显示成功提示
+            QMessageBox.information(self, "成功", "配置文件已保存，应用程序将自动重启...")
+
+            #  关闭对话框
+            dialog.accept()
+
+            #  重启应用程序
+            script_path = os.path.abspath(sys.argv[0])
+
+            # 启动新进程（使用 start_new_session 确保独立运行）
+            subprocess.Popen(
+                [sys.executable, script_path],
+                start_new_session=True,
+                creationflags=subprocess.DETACHED_PROCESS if os.name == 'nt' else 0
+            )
+
+            self.rologger.log("应用程序重启中...")
+
+            #  等待 500ms：给新进程足够的时间启动
+            import time
+            time.sleep(0.5)
+
+            #  关闭当前应用
+            QApplication.quit()
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"保存失败：{str(e)}")
+            self.rologger.log(f"保存配置文件失败：{str(e)}")
 
     def on_theme_black(self):
         self.rologger.log("on_theme_black")
@@ -804,7 +992,6 @@ class RoHandTestWindow(QMainWindow):
     def on_about(self):
         self.rologger.log(f"on_about")
         QMessageBox.about(self, "关于", "灵巧手自动化测试工具 v1.0\n基于PyQt5开发")
-
 # 定义端口刷新任务线程
 class PortRefreshWorker(QThread):
     finished_with_ports = pyqtSignal(list, str)  # ports, error_message
@@ -812,7 +999,7 @@ class PortRefreshWorker(QThread):
         super().__init__(parent)
     def run(self):
         try:
-            protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+            protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
             ports = RohanManager(protocol_type).read_port_info()
             self.finished_with_ports.emit(ports, "")
         except Exception as e:
@@ -829,7 +1016,7 @@ class DeviceInfoWorker(QThread):
      def run(self):
          try:
              DEFAULT_TEST_RESULT = 0
-             protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+             protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
              device_infos = RohanManager(protocol_type).get_device_info_list(self.ports)
              self.result_ready.emit(device_infos)
          except Exception as e:
