@@ -2,7 +2,7 @@
 @File    : app_test.py
 @Author  : 梁宗豪 (Optimized Version)
 @Date    : 2026-03-05
-@Version : 2.0.0
+@Version : 1.0.0
 @Desc    : APP自动化测试业务控制层 (Controller)
            采用 Pytest Collector 精准收集用例，NodeID 映射更新状态，支持富文本日志渲染。
 """
