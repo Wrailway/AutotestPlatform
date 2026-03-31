@@ -81,7 +81,7 @@ class Aging_test:
             valid_count += 1
 
         if valid_count == 0:
-            return None
+            return [0.0] * MAX_MOTOR_CNT  # 禁止返回None，防止UI解析/Excel导出崩溃
 
         return [round(total / valid_count, 2) for total in sum_currents]
 
@@ -109,21 +109,38 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
         delay = 0.0
 
         while time.time() < end_time + delay:
+            # ====================== 优化点 1：轮询前先检查停止/暂停 ======================
+            stop_test, pause_test = OperateSharedData.read()
+            if stop_test:
+                logger.info('测试已停止')
+                break
+
+            # ====================== 优化点 2：真正阻塞式暂停（直到恢复/停止） ======================
+            while pause_test:
+                time.sleep(Aging_test.action_interval*2)
+                delay += Aging_test.action_interval*2
+                stop_test, pause_test = OperateSharedData.read()
+                if stop_test:  # 暂停期间也能响应停止
+                    logger.info('测试已停止')
+                    break
+            if stop_test:
+                break
+
             round_num += 1
             logger.info(f'################ 第 {round_num} 轮测试开始 ################')
             result = '通过'
             round_results = []
 
-            stop_test,pause_test = OperateSharedData.read()
-            if stop_test:
-                logger.info('测试已停止')
-                break
-
-            if pause_test:
-                logger.info('测试已暂停')
-                time.sleep(0.1)
-                delay += 0.1
-                continue
+            # stop_test,pause_test = OperateSharedData.read()
+            # if stop_test:
+            #     logger.info('测试已停止')
+            #     break
+            #
+            # if pause_test:
+            #     logger.info('测试已暂停')
+            #     time.sleep(0.1)
+            #     delay += 0.1
+            #     continue
 
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
@@ -163,7 +180,7 @@ def print_overall_result(overall_result):
 
 
 def test_single_port(port, device_id):
-    protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+    protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     aging = Aging_test(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -200,7 +217,7 @@ def test_single_port(port, device_id):
 def build_gesture_result(timestamp, content, result, comment):
     return {
         "timestamp": timestamp,
-        "content": content,
+        "content": str(content),
         "result": result,
         "comment": comment
     }

@@ -104,7 +104,7 @@ class MotorCurrentTest:
             valid_count += 1
 
         if valid_count == 0:
-            return [0.0]*6
+            return [0.0] * MAX_MOTOR_CNT  # 禁止返回None，防止UI解析/Excel导出崩溃
 
         return [round(total / valid_count, 2) for total in sum_currents]
 
@@ -142,7 +142,7 @@ class MotorCurrentTest:
 def build_gesture_result(timestamp, result, motors_current, comment=""):
     return {
         "timestamp": timestamp,
-        "content": motors_current,
+        "content": str(motors_current),
         "result": result,
         "comment": comment
     }
@@ -150,7 +150,7 @@ def build_gesture_result(timestamp, result, motors_current, comment=""):
 # ==================== 单端口测试 ====================
 def test_single_port(port, device_id):
     result = "通过"
-    protocol_type = RohanManager.read_config_value("protocol_type", "protocol", 0)
+    protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     tester = MotorCurrentTest(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')

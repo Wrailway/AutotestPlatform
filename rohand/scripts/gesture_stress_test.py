@@ -137,7 +137,7 @@ class GestureStressTest:
 def build_gesture_result(timestamp, content, result, comment="无"):
     return {
         "timestamp": timestamp,
-        "content": content,
+        "content": str(content),
         "result": result,
         "comment": comment
     }
@@ -161,7 +161,7 @@ def print_overall_result(overall_result):
 
 # ==================== 单端口测试 ====================
 def test_single_port(port, device_id):
-    protocol_type = RohanManager.read_config_value("protocol_type", "protocol", 0)
+    protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     tester = GestureStressTest(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
 
@@ -170,14 +170,20 @@ def test_single_port(port, device_id):
             logger.info(f"[{port}] 执行 -> {name}")
             ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             stop_test, pause_test = OperateSharedData.read()
+            # 每个手势前检查暂停/停止
+            stop_test, pause_test = OperateSharedData.read()
             if stop_test:
                 logger.info('测试已停止')
                 break
 
-            if pause_test:
-                logger.info('测试已暂停')
-                time.sleep(tester.action_interval*2)
-                continue
+            # 阻塞式暂停
+            while pause_test:
+                time.sleep(0.2)
+                stop_test, pause_test = OperateSharedData.read()
+                if stop_test:
+                    break
+            if stop_test:
+                break
             # 执行手势
             for ges in gesture:
                 tester.do_gesture(ges)
@@ -219,20 +225,37 @@ def main(ports=None, devices_ids=None, aging_duration=1.5):
         round_num = 0
         delay = 0.0
         while time.time() < end_time + delay:
-            round_num += 1
-            logger.info(f"\n========== 第 {round_num} 轮测试 ==========")
-            round_result = "通过"
-
+            # 阻塞式检查暂停/停止
             stop_test, pause_test = OperateSharedData.read()
             if stop_test:
                 logger.info('测试已停止')
                 break
 
-            if pause_test:
-                logger.info('测试已暂停')
-                time.sleep(0.1)
-                delay += 0.1
-                continue
+            # 真正的暂停：卡在这里，直到恢复或停止
+            while pause_test:
+                time.sleep(0.2)
+                delay += 0.2
+                stop_test, pause_test = OperateSharedData.read()
+                if stop_test:
+                    logger.info('测试已停止')
+                    break
+            if stop_test:
+                break
+
+            round_num += 1
+            logger.info(f"\n========== 第 {round_num} 轮测试 ==========")
+            round_result = "通过"
+
+            # stop_test, pause_test = OperateSharedData.read()
+            # if stop_test:
+            #     logger.info('测试已停止')
+            #     break
+            #
+            # if pause_test:
+            #     logger.info('测试已暂停')
+            #     time.sleep(0.1)
+            #     delay += 0.1
+            #     continue
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ports)) as executor:
                 futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]
