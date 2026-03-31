@@ -412,6 +412,9 @@ def black_style() -> str:
             background-color: #0b1220;
             border: none;
         }
+        QTableWidget QWidget {
+            background-color: #0b1220;
+        }
         QTextEdit#log_text_edit {
             background-color: #0b1220;
             border: 2px solid #243047;
