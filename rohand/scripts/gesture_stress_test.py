@@ -6,6 +6,7 @@ import time
 import concurrent.futures
 from rohand.api.OHandSerialAPI import MAX_MOTOR_CNT
 from rohand.rohand_manager import RohanManager
+from rohand.rohand_common import OperateSharedData
 
 # ==================== 日志配置 ====================
 logger = logging.getLogger(__name__)
@@ -168,7 +169,15 @@ def test_single_port(port, device_id):
         for name, gesture in tester.gestures.items():
             logger.info(f"[{port}] 执行 -> {name}")
             ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            stop_test, pause_test = OperateSharedData.read()
+            if stop_test:
+                logger.info('测试已停止')
+                break
 
+            if pause_test:
+                logger.info('测试已暂停')
+                time.sleep(tester.action_interval*2)
+                continue
             # 执行手势
             for ges in gesture:
                 tester.do_gesture(ges)
@@ -208,11 +217,22 @@ def main(ports=None, devices_ids=None, aging_duration=1.5):
     try:
         end_time = time.time() + aging_duration * SECONDS_PER_HOUR
         round_num = 0
-
-        while time.time() < end_time:
+        delay = 0.0
+        while time.time() < end_time + delay:
             round_num += 1
             logger.info(f"\n========== 第 {round_num} 轮测试 ==========")
             round_result = "通过"
+
+            stop_test, pause_test = OperateSharedData.read()
+            if stop_test:
+                logger.info('测试已停止')
+                break
+
+            if pause_test:
+                logger.info('测试已暂停')
+                time.sleep(0.1)
+                delay += 0.1
+                continue
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ports)) as executor:
                 futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]

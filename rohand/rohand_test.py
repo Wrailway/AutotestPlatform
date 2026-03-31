@@ -1147,15 +1147,17 @@ class ProgressBarWorker(QThread):
         self.total_test_seconds = max(duration, 1)
         self.is_running = True
         self.is_paused = False
+        self.delay = 0.0
 
     def run(self):
         start_time = time.time()
         while self.is_running:
             if self.is_paused:
                 time.sleep(0.1)
+                self.delay += 0.1
                 continue
 
-            elapsed = time.time() - start_time
+            elapsed = time.time() - start_time - self.delay
 
             progress = int((elapsed / self.total_test_seconds) * 100)
             progress = max(0, min(100, progress))  # 限定 0~100
