@@ -6,14 +6,14 @@ from __future__ import annotations
 from typing import Any
 
 
-def cache_default_qss(window: Any) -> None:
+def cache_default_style(window: Any) -> None:
     """
     缓存窗口进入程序时的默认 QSS（用于"默认主题"还原）。
     """
     window._default_qss = window.styleSheet() or ""
 
 
-def qss_blue() -> str:
+def blue_style() -> str:
     """
     蓝色主题样式（默认主题）
     """
@@ -264,15 +264,15 @@ def qss_blue() -> str:
     """
 
 
-def apply_default_qss(window: Any) -> None:
+def apply_default_style(window: Any) -> None:
     """
     应用默认蓝色主题
     """
-    window.setStyleSheet(qss_blue())
+    window.setStyleSheet(blue_style())
 
 
 
-def qss_black() -> str:
+def black_style() -> str:
     return """
         QMainWindow { background-color: #0b1220; }
 
@@ -531,7 +531,7 @@ def qss_black() -> str:
         """
 
 
-def qss_green() -> str:
+def green_style() -> str:
     return """
         QMainWindow { background-color: #f6fbf8; }
 
@@ -718,10 +718,10 @@ def qss_green() -> str:
         """
 
 
-def apply_black_qss(window: Any) -> None:
-    window.setStyleSheet(qss_black())
+def apply_black_style(window: Any) -> None:
+    window.setStyleSheet(black_style())
 
 
-def apply_green_qss(window: Any) -> None:
-    window.setStyleSheet(qss_green())
+def apply_green_style(window: Any) -> None:
+    window.setStyleSheet(green_style())
 

@@ -6,28 +6,27 @@ import os
 import time
 from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, PatternFill, Side
+from openpyxl.styles import Alignment, Border, Side
 from openpyxl.styles.fonts import Font
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.dimensions import RowDimension
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox,
-    QDialog, QLabel, QProgressBar, QPushButton, QHBoxLayout,QStyledItemDelegate,QTextEdit, QDialogButtonBox
+    QDialog, QLabel,QStyledItemDelegate,QTextEdit, QDialogButtonBox
 )
 
 from PyQt5.QtWidgets import QMenu, QAction
 from PyQt5.QtCore import QPoint
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QColor, QFont
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QFont
 from PyQt5.uic import loadUi
 
 from rohand.rohand_logger import RoHandLogger
 from rohand.rohand_manager import RohanManager
 
-from rohand_theme import cache_default_qss, apply_black_qss, apply_green_qss, apply_default_qss
+from rohand_theme import apply_black_style, apply_green_style, apply_default_style
 
 
 # ---------------------------------------------------------------------------
@@ -979,15 +978,15 @@ class RoHandTestWindow(QMainWindow):
 
     def on_theme_black(self):
         self.rologger.log("on_theme_black")
-        apply_black_qss(self)
+        apply_black_style(self)
 
     def on_theme_green(self):
         self.rologger.log("on_theme_green")
-        apply_green_qss(self)
+        apply_green_style(self)
 
     def on_theme_default(self):
         self.rologger.log(f"on_theme_default")
-        apply_default_qss(self)
+        apply_default_style(self)
 
     def on_about(self):
         self.rologger.log(f"on_about")
