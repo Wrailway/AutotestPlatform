@@ -392,8 +392,8 @@ class RoHandTestWindow(QMainWindow):
 
     def _on_device_info_update(self, device_info_list, checked):
         self.rologger.log('_on_device_info_update')
-        self.rologger.log(f'设备信息列表: {device_info_list}')
-        self.rologger.log(f'勾选状态: {checked}')
+        # self.rologger.log(f'设备信息列表: {device_info_list}')
+        # self.rologger.log(f'勾选状态: {checked}')
         if  not device_info_list:
             return
 
@@ -473,7 +473,12 @@ class RoHandTestWindow(QMainWindow):
         self.rologger.log(f'on_select_all')
         checked = (state == 2)
         if self.port_names[0] != '无可用端口':
-            self.select_port_names = self.port_names.copy() if checked else []
+            # self.select_port_names = self.port_names.copy() if checked else []
+            if not checked:
+                self.test_data_table.setRowCount(0)
+                self.device_info_list.clear()
+                self.select_port_names.clear()
+
             for cbx in self.check_box_list:
                 if cbx.text() == LABEL_SELECT_ALL:
                     continue
@@ -724,6 +729,8 @@ class RoHandTestWindow(QMainWindow):
         def _on_task_finished(title, result):
             self.on_test_finished_auto()
             self.status_bar.showMessage("当前任务已停止")
+            self.stop_test = False
+            self.pause_test = False
             # 用完断开信号，避免重复触发
             self.executeScriptWorker.finished_with_script_result.disconnect(_on_task_finished)
 
@@ -1084,12 +1091,11 @@ class DeviceInfoWorker(QThread):
 
      def run(self):
          try:
-             DEFAULT_TEST_RESULT = 0
              protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
              device_infos = RohanManager(protocol_type).get_device_info_list(self.ports)
              self.result_ready.emit(device_infos)
          except Exception as e:
-             self.result_ready.emit(str(e))
+             self.result_ready.emit([])  #修复：永远返回列表
 
 
 class ExecuteScriptWorker(QThread):
