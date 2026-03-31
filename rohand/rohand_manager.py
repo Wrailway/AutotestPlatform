@@ -6,11 +6,10 @@ from datetime import datetime
 import can
 import serial.tools.list_ports
 
-from rohand.api.OHandSerialAPI import HAND_RESP_SUCCESS
+from rohand.api.OHandSerialAPI import HAND_RESP_SUCCESS, MAX_MOTOR_CNT
 from rohand.api.can_client import CanClient
 from rohand.api.modbus_client import ModbusClient
 from rohand.rohand_common import STATUS_CONNECTED_UI, build_device_info
-from rohand.rohand_manager2 import MAX_ID, ROH_FW_VERSION
 
 # 修复日志引用错误
 logger = logging.getLogger(__name__)
@@ -27,11 +26,14 @@ class RohanManager:
     MODBUS_PROTOCOL = 0
     PEAK_CAN_PROTOCOL = 1
     ROH_FW_VERSION = 1001
+    ROH_FINGER_POS_TARGET0 = 1135
+    ROH_FINGER_CURRENT0 = 1105
 
     client = None
     # _instance = None
     port = None
     device_id = None
+    MAX_ID = 247
 
     # ==============================
     # 单例模式
@@ -255,6 +257,72 @@ class RohanManager:
                 sw_version = "--"
         return sw_version
 
+    def setFingerPos(self,gesture:list,device_id:int):
+        print(f'gesture = {gesture}')
+        DEFAULT_SPEED = 255
+        if not self.client:
+            logger.warning(f'client未创建')
+            return False
+        if self.protocol_type == self.MODBUS_PROTOCOL:
+            return self.mb_write_register(address=self.ROH_FINGER_POS_TARGET0,value = gesture,device_id=device_id)
+        else:
+            all_success = True
+            for finger_id in range(MAX_MOTOR_CNT):
+                remote_err = []
+                err = self.client.serialClient.HAND_SetFingerPos(
+                    device_id, finger_id,
+                    gesture[finger_id],
+                    DEFAULT_SPEED,
+                    remote_err
+                )
+                if err != HAND_RESP_SUCCESS:
+                    all_success = False
+            return all_success
+
+    def getFingerPos(self,device_id:int):
+        if not self.client:
+            logger.warning(f'client未创建')
+            return None
+        if self.protocol_type == self.MODBUS_PROTOCOL:
+            response = self.mb_read_register(address=self.ROH_FINGER_POS_TARGET0, count=6,device_id=device_id)
+            if response is not None and not response.isError():
+                return response.registers
+            else:
+                return None
+        else:
+            positions = [0]*MAX_MOTOR_CNT
+            for finger_id in range(MAX_MOTOR_CNT):
+                target_pos = [0]
+                current_pos = [0]
+                err,target_pos,current_pos = self.client.serialClient.HAND_GetFingerPos(device_id, finger_id, target_pos, current_pos, [])
+                if err == HAND_RESP_SUCCESS:
+                    positions[finger_id]=current_pos
+                else:
+                    return None
+            return positions
+
+    def getFingerCurrent(self,device_id:int):
+        if not self.client:
+            logger.warning(f'client未创建')
+            return None
+        if self.protocol_type == self.MODBUS_PROTOCOL:
+            response = self.mb_read_register(address=self.ROH_FINGER_CURRENT0, count=6, device_id=device_id)
+            if response is not None and not response.isError():
+                return response.registers
+            else:
+                return None
+        else:
+            currents = [0] * MAX_MOTOR_CNT
+            for finger_id in range(MAX_MOTOR_CNT):
+                current_limit = [0]
+                err, current_limit_get = self.client.serialClient.HAND_GetFingerCurrent(device_id, finger_id, current_limit, [])
+                # 仅当采集成功时累加（排除错误数据）
+                if err == HAND_RESP_SUCCESS:
+                    currents[finger_id] = current_limit_get
+                else:
+                    return None
+            return currents
+
     def get_device_info(self, port):
         return self._get_single_port_device_info(port)
 
@@ -291,7 +359,7 @@ class RohanManager:
         connect_status = STATUS_CONNECTED_UI
 
         # 遍历设备ID（2~MAX_ID）
-        for device_id in range(2, MAX_ID):
+        for device_id in range(2, self.MAX_ID):
             try:
                 if self.protocol_type == self.MODBUS_PROTOCOL:
                     response = self.mb_read_register(self.ROH_FW_VERSION, 2, device_id)
@@ -359,7 +427,7 @@ if __name__ == "__main__":
         create_ok = modbus_manager.create_client(test_modbus_port)
         print(f"创建 Modbus 客户端: {'成功' if create_ok else '失败'}")
         if create_ok:
-            read_data = modbus_manager.mb_read_register(address=ROH_FW_VERSION, count=2, device_id=2)
+            read_data = modbus_manager.mb_read_register(address=1001, count=2, device_id=2)
             print(f"读固件版本寄存器返回数据: {read_data}")
             fw_version = modbus_manager.get_firmware_version(device_id=2)
             print(f"获取固件版本: {fw_version}")

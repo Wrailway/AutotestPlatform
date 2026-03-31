@@ -716,6 +716,12 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
    <property name="text">
     <string>加载脚本</string>
    </property>
+   <property name="iconText">
+    <string notr="true">加载脚本</string>
+   </property>
+   <property name="toolTip">
+    <string notr="true">加载脚本</string>
+   </property>
    <property name="shortcut">
     <string>Ctrl+N</string>
    </property>
