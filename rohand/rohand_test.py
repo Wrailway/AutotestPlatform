@@ -69,6 +69,7 @@ class RoHandTestWindow(QMainWindow):
         self.raw_test_data = None
         self.stop_test = False
         self.pause_test = False
+        self.executeScriptWorker = None
 
         # 加载UI xml文件
         base = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +89,7 @@ class RoHandTestWindow(QMainWindow):
         self._bind_all_events()
 
         self._init_manager()
+        OperateSharedData.write(False,False)
         self.closeEvent = self.close_event_handler
 
     def close_event_handler(self, event):
@@ -527,6 +529,13 @@ class RoHandTestWindow(QMainWindow):
             self.status_bar.showMessage(f"请选择测试脚本")
             return
 
+        if self.executeScriptWorker is not None and self.executeScriptWorker.isRunning():
+            return
+
+        self.pause_test = False
+        self.stop_test = False
+        OperateSharedData.write(False, False)
+
         # 1. 读取老化时间
         self.total_test_seconds = self.selected_aging_hours * 3600 + self.get_offset_duration()
 
@@ -553,6 +562,7 @@ class RoHandTestWindow(QMainWindow):
         self.test_progress_bar.setValue(value)
 
     def on_test_finished_auto(self):
+        # OperateSharedData.write(False, False)
         self.status_bar.showMessage("测试已完成")
         self.rologger.log("老化测试时间到，自动结束")
 
