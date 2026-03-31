@@ -152,6 +152,7 @@ QProgressBar::chunk {
 #stat_num_total { color: #303133; }
 #stat_num_pass { color: #67c23a; }
 #stat_num_fail { color: #f56c6c; }
+#stat_num_skip { color: #e6a23c; } /* 新增跳过颜色 */
 
 </string>
   </property>
@@ -753,6 +754,41 @@ p, li { white-space: pre-wrap; }
            </item>
           </layout>
          </item>
+         <!-- 新增的跳过数据面板 -->
+         <item>
+          <layout class="QVBoxLayout" name="box_skip">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="stat_num_skip">
+             <property name="class" stdset="0">
+              <string>stat_number</string>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="stat_lbl_skip">
+             <property name="class" stdset="0">
+              <string>stat_label</string>
+             </property>
+             <property name="text">
+              <string>SKIP</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <!-- 新增结束 -->
         </layout>
        </item>
       </layout>

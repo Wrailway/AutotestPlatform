@@ -153,6 +153,7 @@ class Ui_AppTestWindow(object):
 "#stat_num_total { color: #303133; }\n"
 "#stat_num_pass { color: #67c23a; }\n"
 "#stat_num_fail { color: #f56c6c; }\n"
+"#stat_num_skip { color: #e6a23c; } /* 新增跳过颜色 */\n"
 "\n"
 "")
         self.centralwidget = QtWidgets.QWidget(AppTestWindow)
@@ -395,6 +396,18 @@ class Ui_AppTestWindow(object):
         self.stat_lbl_fail.setObjectName("stat_lbl_fail")
         self.box_fail.addWidget(self.stat_lbl_fail)
         self.layout_dashboard.addLayout(self.box_fail)
+        self.box_skip = QtWidgets.QVBoxLayout()
+        self.box_skip.setSpacing(0)
+        self.box_skip.setObjectName("box_skip")
+        self.stat_num_skip = QtWidgets.QLabel(self.bottom_panel)
+        self.stat_num_skip.setAlignment(QtCore.Qt.AlignCenter)
+        self.stat_num_skip.setObjectName("stat_num_skip")
+        self.box_skip.addWidget(self.stat_num_skip)
+        self.stat_lbl_skip = QtWidgets.QLabel(self.bottom_panel)
+        self.stat_lbl_skip.setAlignment(QtCore.Qt.AlignCenter)
+        self.stat_lbl_skip.setObjectName("stat_lbl_skip")
+        self.box_skip.addWidget(self.stat_lbl_skip)
+        self.layout_dashboard.addLayout(self.box_skip)
         self.horizontalLayout_3.addLayout(self.layout_dashboard)
         self.main_layout.addWidget(self.bottom_panel)
         AppTestWindow.setCentralWidget(self.centralwidget)
@@ -502,6 +515,10 @@ class Ui_AppTestWindow(object):
         self.stat_num_fail.setText(_translate("AppTestWindow", "0"))
         self.stat_lbl_fail.setProperty("class", _translate("AppTestWindow", "stat_label"))
         self.stat_lbl_fail.setText(_translate("AppTestWindow", "FAIL"))
+        self.stat_num_skip.setProperty("class", _translate("AppTestWindow", "stat_number"))
+        self.stat_num_skip.setText(_translate("AppTestWindow", "0"))
+        self.stat_lbl_skip.setProperty("class", _translate("AppTestWindow", "stat_label"))
+        self.stat_lbl_skip.setText(_translate("AppTestWindow", "SKIP"))
         self.menuFile.setTitle(_translate("AppTestWindow", "文件(File)"))
         self.menuConfig.setTitle(_translate("AppTestWindow", "配置(Settings)"))
         self.menuOptions.setTitle(_translate("AppTestWindow", "选项(Options)"))
