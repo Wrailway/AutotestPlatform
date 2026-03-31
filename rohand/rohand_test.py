@@ -70,6 +70,9 @@ class RoHandTestWindow(QMainWindow):
         self.stop_test = False
         self.pause_test = False
         self.executeScriptWorker = None
+        self.port_refresh_worker = None
+        self.deviceInfoWorker = None
+        self.progressbar_worker = None
 
         # 加载UI xml文件
         base = os.path.dirname(os.path.abspath(__file__))
