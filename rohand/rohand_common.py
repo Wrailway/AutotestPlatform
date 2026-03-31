@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 import os
 import configparser
+import threading
 from datetime import datetime
+
+import json
+
+import logger
 
 # ---------------------------------------------------------------------------
 # 表格列名常量
@@ -56,8 +61,8 @@ DEFAULT_AGING_OPTIONS = [
 # 延迟常量
 REFRESH_PROMPT_DELAY_MS = 450
 
-
-
+# 全局线程锁，保证多线程读写安全
+FILE_LOCK = threading.Lock()
 
 def build_device_info(port, sw_version, device_id, connect_status, test_result=DEFAULT_TEST_RESULT):
     """统一构建设备信息字典，供 manager/UI 复用。"""
@@ -68,4 +73,45 @@ def build_device_info(port, sw_version, device_id, connect_status, test_result=D
         COL_CONNECT_STATUS: connect_status,
         COL_TEST_RESULT: test_result,
     }
+
+class OperateSharedData:
+    """测试控制状态读写类（读、写两个方法）"""
+    _FILE = "shared_data.json"
+
+    @classmethod
+    def write(cls, stop_test: bool, pause_test: bool):
+        """写入：停止、暂停标志"""
+        with FILE_LOCK:
+            data = {"stop_test": stop_test, "pause_test": pause_test}
+            with open(cls._FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f)
+                f.flush()
+                os.fsync(f.fileno())
+
+    @classmethod
+    def read(cls):
+        """读取：返回 (stop_test, pause_test)"""
+        with FILE_LOCK:
+            try:
+                with open(cls._FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                stop = data.get("stop_test", False)
+                pause = data.get("pause_test", False)
+                return stop, pause
+            except Exception as e:
+                return False, False
+
+    @classmethod
+    def delete_shared_data_file(cls):
+        """删除 shared_data.json 文件，带异常处理 + 线程安全"""
+        file_path = 'shared_data.json'
+
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            pass
+
+
+
 

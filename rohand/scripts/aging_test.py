@@ -7,6 +7,8 @@ import concurrent.futures
 from rohand.api.OHandSerialAPI import MAX_MOTOR_CNT
 from rohand.rohand_manager import RohanManager
 
+from rohand.rohand_common import OperateSharedData
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -104,12 +106,25 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
     try:
         end_time = time.time() + aging_duration * SECONDS_PER_HOUR
         round_num = 0
+        delay = 0.0
 
-        while time.time() < end_time:
+        while time.time() < end_time + delay:
             round_num += 1
             logger.info(f'################ 第 {round_num} 轮测试开始 ################')
             result = '通过'
             round_results = []
+
+            stop_test,pause_test = OperateSharedData.read()
+            if stop_test:
+                logger.info('测试已停止')
+                break
+
+            if pause_test:
+                logger.info('测试已暂停')
+                time.sleep(0.1)
+                delay += 0.1
+                continue
+
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
                 futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]

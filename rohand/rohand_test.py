@@ -42,6 +42,8 @@ from rohand_common import (
     DIALOG_REFRESH_TITLE, DIALOG_REFRESH_TIP, DEFAULT_AGING_OPTIONS, REFRESH_PROMPT_DELAY_MS
 )
 
+from rohand_common import OperateSharedData
+
 class RoHandTestWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -65,6 +67,8 @@ class RoHandTestWindow(QMainWindow):
         self.script_name = None
         self.report_title = None
         self.raw_test_data = None
+        self.stop_test = False
+        self.pause_test = False
 
         # 加载UI xml文件
         base = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +88,11 @@ class RoHandTestWindow(QMainWindow):
         self._bind_all_events()
 
         self._init_manager()
+        self.closeEvent = self.close_event_handler
+
+    def close_event_handler(self, event):
+        OperateSharedData.delete_shared_data_file()
+        event.accept()
 
     # ------------------------------------------------------------------
     # UI 组件初始化
@@ -658,10 +667,56 @@ class RoHandTestWindow(QMainWindow):
         return port_data_dict
 
     def on_pause_test(self):
-        self.rologger.log(f'on_pause_test')
+        self.rologger.log('on_pause_test')
+
+        # 先判断：没有运行中的任务 → 直接返回
+        if not hasattr(self, 'executeScriptWorker') or not self.executeScriptWorker.isRunning():
+            self.status_bar.showMessage('当前没有在执行的任务')
+            return
+
+        # 已停止 → 不能暂停
+        if self.stop_test:
+            self.status_bar.showMessage('当前无测试脚本在运行')
+            return
+
+        # 核心：切换暂停状态 ← 你原本的逻辑
+        self.pause_test = not self.pause_test
+        OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
+
+        # 状态提示
+        if self.pause_test:
+            self.progressbar_worker.pause()
+            self.status_bar.showMessage('当前任务已暂停，再次点击继续执行')
+        else:
+            self.progressbar_worker.resume()
+            self.status_bar.showMessage('当前任务已恢复执行')
 
     def on_stop_test(self):
         self.rologger.log(f'on_stop_test')
+
+        # 没有运行中的任务
+        if not hasattr(self, 'executeScriptWorker') or not self.executeScriptWorker.isRunning():
+            self.status_bar.showMessage('当前没有在执行的任务')
+            return
+
+        # 1. 设置状态
+        self.stop_test = True
+        self.pause_test = True
+        OperateSharedData.write(stop_test=True, pause_test=True)
+
+        self.status_bar.showMessage("正在停止任务...")
+        self.progressbar_worker.stop()
+
+        # 2. 线程结束后自动回调（不阻塞、不闪退）
+        def _on_task_finished(title, result):
+            self.on_test_finished_auto()
+            self.status_bar.showMessage("当前任务已停止")
+            # 用完断开信号，避免重复触发
+            self.executeScriptWorker.finished_with_script_result.disconnect(_on_task_finished)
+
+        # 3. 绑定信号 + 触发停止
+        self.executeScriptWorker.finished_with_script_result.connect(_on_task_finished)
+        self.executeScriptWorker.stop_task()
 
     def on_load_script(self):
         self.rologger.log(f'on_load_script')
@@ -991,6 +1046,8 @@ class RoHandTestWindow(QMainWindow):
     def on_about(self):
         self.rologger.log(f"on_about")
         QMessageBox.about(self, "关于", "灵巧手自动化测试工具 v1.0\n基于PyQt5开发")
+
+
 # 定义端口刷新任务线程
 class PortRefreshWorker(QThread):
     finished_with_ports = pyqtSignal(list, str)  # ports, error_message
@@ -1021,22 +1078,27 @@ class DeviceInfoWorker(QThread):
          except Exception as e:
              self.result_ready.emit(str(e))
 
-# 定义执行测试脚本任务线程，执行完成后，脚本会返回测试结果
-class ExecuteScriptWorker(QThread):
-    # 修正信号：用例描述、结果列表、执行标记（True=成功 False=失败）
-    finished_with_script_result = pyqtSignal(str, list)  # 3个参数
 
-    def __init__(self, ports: list, device_ids: list,aging_duration: float, script_path: str, parent=None):
+class ExecuteScriptWorker(QThread):
+    finished_with_script_result = pyqtSignal(str, list)
+
+    def __init__(self, ports: list, device_ids: list, aging_duration: float, script_path: str, parent=None):
         super().__init__(parent)
         self.ports = ports
         self.device_ids = device_ids
         self.aging_duration = aging_duration
         self.script_path = script_path
-        print(f'script_path = {self.script_path}')
+
+        # 停止标记（安全可控）
+        self._is_stopped = False
 
     def run(self):
         try:
-            # 1. 检查脚本
+            # 执行前检查：已经停止就直接退出
+            if self._is_stopped:
+                self.finished_with_script_result.emit("任务已停止", [])
+                return
+
             if not os.path.exists(self.script_path):
                 self.finished_with_script_result.emit("脚本不存在", [])
                 return
@@ -1044,29 +1106,36 @@ class ExecuteScriptWorker(QThread):
             if not self.ports:
                 return
 
-            # 2. 获取脚本目录，加入环境变量（能 import）
             script_dir = os.path.dirname(self.script_path)
             if script_dir not in sys.path:
                 sys.path.append(script_dir)
 
-            # 3. 获取脚本模块名（自动识别）
             script_name = os.path.splitext(os.path.basename(self.script_path))[0]
-
-            # 4. 动态导入脚本
             module = __import__(script_name)
 
-            # 5. 【核心】像你原来一样调用 main 函数
+            # 执行脚本
             report_title, overall_result = module.main(
                 ports=self.ports,
                 devices_ids=self.device_ids,
                 aging_duration=self.aging_duration
             )
 
-            # 6. 发射结果（完全匹配你的返回值）
+            # 如果中途被停止，返回停止信息
+            if self._is_stopped:
+                self.finished_with_script_result.emit("任务已停止", [])
+                return
+
             self.finished_with_script_result.emit(report_title, overall_result)
 
         except Exception as e:
-            self.finished_with_script_result.emit(f"执行异常：{str(e)}", [])
+            if self._is_stopped:
+                self.finished_with_script_result.emit("任务已停止", [])
+            else:
+                self.finished_with_script_result.emit(f"执行异常：{str(e)}", [])
+
+    # 安全停止方法
+    def stop_task(self):
+        self._is_stopped = True
 
 
 class ProgressBarWorker(QThread):
