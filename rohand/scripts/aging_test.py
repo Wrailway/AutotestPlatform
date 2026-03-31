@@ -117,8 +117,8 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
 
             # ====================== 优化点 2：真正阻塞式暂停（直到恢复/停止） ======================
             while pause_test:
-                time.sleep(Aging_test.action_interval*2)
-                delay += Aging_test.action_interval*2
+                time.sleep(0.2)
+                delay += 0.2
                 stop_test, pause_test = OperateSharedData.read()
                 if stop_test:  # 暂停期间也能响应停止
                     logger.info('测试已停止')
