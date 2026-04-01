@@ -285,8 +285,8 @@ class RohanManager:
             return None
         if self.protocol_type == self.MODBUS_PROTOCOL:
             response = self.mb_read_register(address=self.ROH_FINGER_POS_TARGET0, count=6,device_id=device_id)
-            if response is not None:#and not response.isError():
-                return response.registers
+            if response is not None:
+                return response
             else:
                 return None
         else:
@@ -308,7 +308,7 @@ class RohanManager:
         if self.protocol_type == self.MODBUS_PROTOCOL:
             response = self.mb_read_register(address=self.ROH_FINGER_CURRENT0, count=6, device_id=device_id)
             if response is not None:#and not response.isError():
-                return response.registers
+                return response
             else:
                 return None
         else:
