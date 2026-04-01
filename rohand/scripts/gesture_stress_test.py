@@ -160,7 +160,7 @@ def print_overall_result(overall_result):
 
 
 # ==================== 单端口测试 ====================
-def test_single_port(port, device_id):
+def run_single_port(port, device_id):
     protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     tester = GestureStressTest(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
@@ -258,7 +258,7 @@ def main(ports=None, devices_ids=None, aging_duration=1.5):
             #     continue
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ports)) as executor:
-                futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]
+                futures = [executor.submit(run_single_port, p, d) for p, d in zip(ports, devices_ids)]
                 for future in concurrent.futures.as_completed(futures):
                     res = future.result()
                     overall_result.append(res)

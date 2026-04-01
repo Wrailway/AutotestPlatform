@@ -44,15 +44,6 @@ class RohanManager:
     #     return cls._instance
 
     def __init__(self, protocol_type):
-        self.protocol_type = protocol_type
-        self.port = None
-        self.client = None
-
-        # 确保协议类型是整数
-        if isinstance(self.protocol_type, str):
-            self.protocol_type = int(self.protocol_type)
-
-        # 初始化时记录协议类型
         if not hasattr(self, 'protocol_type'):
             self.protocol_type = protocol_type
             protocol_name = "Modbus" if self.protocol_type == self.MODBUS_PROTOCOL else "PEAK CAN"
@@ -293,10 +284,11 @@ class RohanManager:
             logger.warning(f'client未创建')
             return None
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            # mb_read_register 已经返回 registers list，不需要再检查 isError
             response = self.mb_read_register(address=self.ROH_FINGER_POS_TARGET0, count=6,device_id=device_id)
-            # response 已经是 list 了，直接返回
-            return response
+            if response is not None:#and not response.isError():
+                return response.registers
+            else:
+                return None
         else:
             positions = [0]*MAX_MOTOR_CNT
             for finger_id in range(MAX_MOTOR_CNT):
@@ -314,11 +306,11 @@ class RohanManager:
             logger.warning(f'client未创建')
             return None
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            # mb_read_register 已经返回 registers list，不需要再检查 isError
             response = self.mb_read_register(address=self.ROH_FINGER_CURRENT0, count=6, device_id=device_id)
-            # response 已经是 list 了，直接返回
-            return response
-
+            if response is not None:#and not response.isError():
+                return response.registers
+            else:
+                return None
         else:
             currents = [0] * MAX_MOTOR_CNT
             for finger_id in range(MAX_MOTOR_CNT):
@@ -326,7 +318,7 @@ class RohanManager:
                 err, current_limit_get = self.client.serialClient.HAND_GetFingerCurrent(device_id, finger_id, current_limit, [])
                 # 仅当采集成功时累加（排除错误数据）
                 if err == HAND_RESP_SUCCESS:
-                    currents[finger_id] = current_limit_get[0]
+                    currents[finger_id] = current_limit_get
                 else:
                     return None
             return currents

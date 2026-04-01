@@ -144,7 +144,7 @@ def main(ports: list = [], devices_ids: list = [], aging_duration: float = 1.5):
 
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-                futures = [executor.submit(test_single_port, p, d) for p, d in zip(ports, devices_ids)]
+                futures = [executor.submit(run_single_port, p, d) for p, d in zip(ports, devices_ids)]
                 for future in concurrent.futures.as_completed(futures):
                     port_result = future.result()
                     round_results.append(port_result)
@@ -179,7 +179,7 @@ def print_overall_result(overall_result):
                 f'[测试时间：{g["timestamp"]}] | 电流：{g["content"]} | 测试结果：{g["result"]} | 备注：{g["comment"]}')
 
 
-def test_single_port(port, device_id):
+def run_single_port(port, device_id):
     protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     aging = Aging_test(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
