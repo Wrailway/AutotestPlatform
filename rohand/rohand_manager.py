@@ -44,6 +44,15 @@ class RohanManager:
     #     return cls._instance
 
     def __init__(self, protocol_type):
+        self.protocol_type = protocol_type
+        self.port = None
+        self.client = None
+
+        # 确保协议类型是整数
+        if isinstance(self.protocol_type, str):
+            self.protocol_type = int(self.protocol_type)
+
+        # 初始化时记录协议类型
         if not hasattr(self, 'protocol_type'):
             self.protocol_type = protocol_type
             protocol_name = "Modbus" if self.protocol_type == self.MODBUS_PROTOCOL else "PEAK CAN"
