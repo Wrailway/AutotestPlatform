@@ -685,6 +685,7 @@ class RoHandTestWindow(QMainWindow):
         return port_data_dict
 
     def on_pause_test(self):
+        """暂停/恢复测试"""
         self.rologger.log('on_pause_test')
 
         # 先判断：没有运行中的任务 → 直接返回
@@ -701,13 +702,19 @@ class RoHandTestWindow(QMainWindow):
         self.pause_test = not self.pause_test
         OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
 
-        # 状态提示
+        # 状态提示和按钮文本切换
         if self.pause_test:
+            # 暂停测试
             self.progressbar_worker.pause()
-            self.status_bar.showMessage('当前任务已暂停，再次点击继续执行')
+            self.pause_test_btn.setText("继续测试")
+            self.status_bar.showMessage('当前任务已暂停，点击继续执行')
+            self.rologger.log("测试已暂停")
         else:
+            # 恢复测试
             self.progressbar_worker.resume()
+            self.pause_test_btn.setText("暂停测试")
             self.status_bar.showMessage('当前任务已恢复执行')
+            self.rologger.log("测试已恢复")
 
     def on_stop_test(self):
         self.rologger.log(f'on_stop_test')
