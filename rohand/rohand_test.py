@@ -760,27 +760,55 @@ class RoHandTestWindow(QMainWindow):
         self.executeScriptWorker.finished_with_script_result.connect(_on_task_finished)
         self.executeScriptWorker.stop_task()
 
+    # def on_load_script(self):
+    #     self.rologger.log(f'on_load_script')
+    #     # 弹出文件选择对话框，默认打开 scripts 文件夹
+    #     file_path, _ = QFileDialog.getOpenFileName(
+    #         self,
+    #         '选择要执行的脚本',
+    #         'scripts',
+    #         'Python files (*.py)'
+    #     )
+    #     if file_path:
+    #         # 获取文件名（包含扩展名）
+    #         file_name = os.path.basename(file_path)
+    #         # 获取 scripts 目录绝对路径，并自动创建（防止目录不存在）
+    #         scripts_dir = os.path.abspath('scripts')
+    #         if not os.path.exists(scripts_dir):
+    #             os.makedirs(scripts_dir)
+    #         # 拼接最终脚本路径
+    #         self.script_name = os.path.join(scripts_dir, file_name)
+    #         # # 读取文件内容（你原来的代码只打开没读取，我帮你补上）
+    #         # with open(file_path, 'r', encoding='utf-8') as f:
+    #         #     self.script_content = f.read()
+    #         self.rologger.log(f'成功加载脚本：{self.script_name}')
+    #         self.rologger.log(f'请点击【开始测试】按钮执行脚本\n')
     def on_load_script(self):
         self.rologger.log(f'on_load_script')
-        # 弹出文件选择对话框，默认打开 scripts 文件夹
+
+        # ===================== 固定正确路径 =====================
+        # 获取当前 .py 文件所在目录（rohand 文件夹）
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # 拼接正确的 scripts 路径
+        scripts_dir = os.path.join(base_dir, "scripts")
+
+        # 自动创建目录
+        if not os.path.exists(scripts_dir):
+            os.makedirs(scripts_dir)
+
+        # 打开对话框，默认定位到正确的 scripts 目录
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             '选择要执行的脚本',
-            'scripts',
+            scripts_dir,  # 这里用正确路径
             'Python files (*.py)'
         )
+
         if file_path:
-            # 获取文件名（包含扩展名）
-            file_name = os.path.basename(file_path)
-            # 获取 scripts 目录绝对路径，并自动创建（防止目录不存在）
-            scripts_dir = os.path.abspath('scripts')
-            if not os.path.exists(scripts_dir):
-                os.makedirs(scripts_dir)
-            # 拼接最终脚本路径
-            self.script_name = os.path.join(scripts_dir, file_name)
-            # # 读取文件内容（你原来的代码只打开没读取，我帮你补上）
-            # with open(file_path, 'r', encoding='utf-8') as f:
-            #     self.script_content = f.read()
+            # 直接使用选择到的路径（不再乱拼接）
+            self.script_name = file_path
+
             self.rologger.log(f'成功加载脚本：{self.script_name}')
             self.rologger.log(f'请点击【开始测试】按钮执行脚本\n')
 
