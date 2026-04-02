@@ -1,55 +1,95 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+CAN 协议客户端实现
+继承抽象接口 ABSApiClient，完成 CAN 总线连接、断开、设备通信封装
+"""
 import re
-
 import logging
 
 from rohand.api.abs_api_client import ABSApiClient
 from rohand.api.OHandSerialAPI import HAND_PROTOCOL_UART, OHandSerialAPI
-from rohand.api.can_interface import CAN_Init, send_data_impl, get_milli_seconds_impl, recv_data_impl, \
+from rohand.api.can_interface import (
+    CAN_Init,
+    send_data_impl,
+    get_milli_seconds_impl,
+    recv_data_impl,
     delay_milli_seconds_impl
+)
 
 # ==============================
-# Can协议客户端实现部分
+# 日志配置
 # ==============================
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
+# ==============================
+# CAN 协议客户端实现
+# ==============================
 class CanClient(ABSApiClient):
+    """
+    CAN 总线通信客户端
+    实现连接、断开、底层接口封装，对接 OHandSerialAPI
+    """
+    # 通信参数常量
     baudrate = 1000000
     ADDRESS_MASTER = 0x01
-    serialClient = None
-    can_interface_instance = None
     SUCCESS = 0x00
 
+    # 实例对象
+    serialClient = None
+    can_interface_instance = None
+
     def __init__(self, port):
+        """
+        初始化 CAN 客户端
+        :param port: CAN 通道名，如 PCAN_USBBUS1
+        """
         ABSApiClient.__init__(self, port)
 
     def connect(self):
+        """
+        建立 CAN 总线连接
+        1. 解析端口号
+        2. 初始化 CAN 接口
+        3. 初始化 OHandSerialAPI 协议层
+        """
         try:
+            # 从端口名提取数字（PCAN_USBBUS1 → 1）
             port_num = int(re.findall(r'\d+', self.port)[0])
             logger.info(f'port_num={port_num}')
+
+            # 初始化 CAN 硬件接口
             self.can_interface_instance = CAN_Init(port_name=port_num, baudrate=self.baudrate)
             if self.can_interface_instance is None:
                 logger.info("port init failed\n")
+                return
+
+            # 初始化协议 API
             protocol = HAND_PROTOCOL_UART
-            self.serialClient = OHandSerialAPI(self.can_interface_instance, protocol, self.ADDRESS_MASTER,
-                                               send_data_impl,
-                                               recv_data_impl)
+            self.serialClient = OHandSerialAPI(
+                self.can_interface_instance,
+                protocol,
+                self.ADDRESS_MASTER,
+                send_data_impl,
+                recv_data_impl
+            )
             self.serialClient.HAND_SetTimerFunction(get_milli_seconds_impl, delay_milli_seconds_impl)
             self.serialClient.HAND_SetCommandTimeOut(255)
+            logger.info(f"[CAN {self.port}] Connect successfully")
+
         except Exception as e:
             logger.info(f"\n初始化异常: {str(e)}")
 
     def disconnect(self):
         """
-        安全断开CAN连接（优化版）
-        - 先关闭API客户端，再关闭CAN总线
-        - 兼容无shutdown方法的场景
-        - 强制清空属性，避免残留引用
+        安全断开 CAN 连接
+        - 关闭 API 客户端
+        - 关闭 CAN 总线
+        - 强制清空对象引用，避免内存残留
         """
-        # 1. 关闭OHandSerialAPI客户端
+        # 关闭 API 客户端
         if self.serialClient:
             try:
                 if hasattr(self.serialClient, "shutdown"):
@@ -60,10 +100,9 @@ class CanClient(ABSApiClient):
             except Exception as e:
                 logger.error(f"[CAN {self.port}] Error during API shutdown: {str(e)}", exc_info=True)
             finally:
-                # 强制清空，无论是否报错
                 self.serialClient = None
 
-        # 2. 关闭CAN总线接口
+        # 关闭 CAN 硬件接口
         if self.can_interface_instance:
             try:
                 if hasattr(self.can_interface_instance, "shutdown"):
@@ -74,20 +113,6 @@ class CanClient(ABSApiClient):
             except Exception as e:
                 logger.error(f"[CAN {self.port}] Error closing CAN bus: {str(e)}", exc_info=True)
             finally:
-                # 强制清空，无论是否报错
                 self.can_interface_instance = None
 
-        # 3. 额外兜底：清空端口属性（可选，根据需要）
-        # self.port = None
         logger.info(f"[CAN {self.port}] Disconnect completed")
-
-
-    # def has_device(self,id):
-    #     major, minor, revision = [0], [0], [0]
-    #     err, major_get, minor_get, revision_get = self.serialClient.HAND_GetFirmwareVersion(id, major, minor,
-    #                                                                                           revision, [])
-    #     if err != self.SUCCESS:
-    #         return False
-    #     else:
-    #         return True
-

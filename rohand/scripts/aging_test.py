@@ -184,6 +184,7 @@ def run_single_port(port, device_id):
     aging = Aging_test(protocol_type, port, device_id)
     port_result = {"port": port, "gestures": []}
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    currents = []
 
     try:
         # 抓握
