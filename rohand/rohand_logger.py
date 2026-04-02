@@ -102,7 +102,7 @@ class RoHandLogger:
         # 日志文件名
         timestamp = str(int(time.time()))
         current_date = time.strftime("%Y-%m-%d", time.localtime())
-        log_file_name = os.path.join(log_folder, f"ClientTest_log_{current_date}_{timestamp}.txt")
+        log_file_name = os.path.join(log_folder, f"Rohand_ClientTest_log_{current_date}_{timestamp}.txt")
 
         # 文件处理器配置
         file_handler = logging.FileHandler(log_file_name, encoding="utf-8")

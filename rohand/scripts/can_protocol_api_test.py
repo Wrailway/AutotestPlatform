@@ -1,5 +1,6 @@
 import datetime
 import os
+import sys
 
 import pytest
 import logging
@@ -12,16 +13,33 @@ from rohand.api.OHandSerialAPI import (
 )
 from rohand.api.can_interface import *
 
-# ==================== 日志配置 ====================
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-if not logger.handlers:
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+log_folder = "./log"
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
+
+timestamp = str(int(time.time()))
+current_date = time.strftime("%Y-%m-%d", time.localtime())
+log_file_name = f'./log/CAN_Protocol_Test_log_{current_date}_{timestamp}.txt'
+
+file_handler = logging.FileHandler(log_file_name, encoding='utf-8')
+file_handler.setLevel(logging.INFO)
+
+log_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(log_format)
+logger.addHandler(file_handler)
+
+stream_handler = logging.StreamHandler(sys.stdout)
+logger.addHandler(stream_handler)
+
+# if not logger.handlers:
+#     console_handler = logging.StreamHandler()
+#     console_handler.setLevel(logging.INFO)
+#     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+#     console_handler.setFormatter(formatter)
+#     logger.addHandler(console_handler)
 
 # ==================== 全局常量 ====================
 ADDRESS_MASTER = 0x01
