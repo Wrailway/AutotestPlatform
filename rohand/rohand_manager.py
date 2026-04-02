@@ -34,6 +34,7 @@ class RohanManager:
     port = None
     device_id = None
     MAX_ID = 247
+    protocol_type = 0
 
     # ==============================
     # 单例模式
@@ -45,18 +46,8 @@ class RohanManager:
 
     def __init__(self, protocol_type):
         self.protocol_type = protocol_type
-        self.port = None
-        self.client = None
-
-        # 确保协议类型是整数
-        if isinstance(self.protocol_type, str):
-            self.protocol_type = int(self.protocol_type)
-
-        # 初始化时记录协议类型
-        if not hasattr(self, 'protocol_type'):
-            self.protocol_type = protocol_type
-            protocol_name = "Modbus" if self.protocol_type == self.MODBUS_PROTOCOL else "PEAK CAN"
-            logger.info(f"初始化管理器，协议类型：{protocol_name}")
+        protocol_name = "Modbus" if self.protocol_type == self.MODBUS_PROTOCOL else "PEAK CAN"
+        logger.info(f"初始化管理器，协议类型：{protocol_name}")
 
     # def get_instance(self):
     #     return self._instance

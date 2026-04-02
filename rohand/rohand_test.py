@@ -454,6 +454,10 @@ class RoHandTestWindow(QMainWindow):
             return
         self.is_refresh_port = True
         self.set_controls_enabled(False)
+        #情况布局文件
+        port_layout = self.scroll_content_widget.layout()
+        self.remove_all_widgets_from_layout(port_layout)
+        self.check_box_list.clear()
         # 清空旧数据
         self.port_names_all.clear()
         self.port_names_selected.clear()
@@ -538,7 +542,6 @@ class RoHandTestWindow(QMainWindow):
         self.rologger.log('on_start_test')
         self.rologger.log(f"script_name = {self.script_name}")
 
-        # 修复：用正确的选中端口
         if not self.port_names_selected:
             self.status_bar.showMessage(f"请选择要测试的端口")
             return
@@ -701,114 +704,56 @@ class RoHandTestWindow(QMainWindow):
 
     def on_pause_test(self):
         """暂停/恢复测试"""
-        # 严格的安全检查—防止未初始化就点击导致崩溃
-        try:
-            # 1. 检查是否有 executeScriptWorker 属性
-            if not hasattr(self, 'executeScriptWorker'):
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        self.rologger.log('on_pause_test')
 
-            # 2. 检查 executeScriptWorker 是否有效
-            if self.executeScriptWorker is None:
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        if self.executeScriptWorker is None:
+            self.status_bar.showMessage('当前没有在执行的任务')
+            return
 
-            # 3. 检查是否在运行
-            if not self.executeScriptWorker.isRunning():
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        if self.stop_test:
+            self.status_bar.showMessage('当前无测试脚本在运行')
+            return
 
-            # 4. 检查是否已停止
-            if self.stop_test:
-                self.status_bar.showMessage('当前无测试脚本在运行')
-                return
+        self.pause_test = not self.pause_test
+        OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
 
-            # 通过所有检查，记录日志（避免日志对象未初始化导致崩溃）
-            if hasattr(self, 'rologger') and self.rologger is not None:
-                self.rologger.log('on_pause_test')
-
-            # 核心：切换暂停状态
-            self.pause_test = not self.pause_test
-            OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
-
-            # 状态提示和按钮文本切换
-            if self.pause_test:
-                # 暂停测试 - 添加空值检查
-                if hasattr(self, 'progressbar_worker') and self.progressbar_worker is not None:
-                    self.progressbar_worker.pause()
-                self.pause_test_btn.setText("继续测试")
-                self.status_bar.showMessage('当前任务已暂停，点击继续执行')
-                if hasattr(self, 'rologger') and self.rologger is not None:
-                    self.rologger.log("测试已暂停")
-            else:
-                # 恢复测试 - 添加空值检查
-                if hasattr(self, 'progressbar_worker') and self.progressbar_worker is not None:
-                    self.progressbar_worker.resume()
-                self.pause_test_btn.setText("暂停测试")
-                self.status_bar.showMessage('当前任务已恢复执行')
-                if hasattr(self, 'rologger') and self.rologger is not None:
-                    self.rologger.log("测试已恢复")
-
-        except Exception as e:
-            # 捕获所有异常，防止崩溃
-            error_msg = f'暂停测试异常：{e}'
-            print(error_msg)
-            if hasattr(self, 'status_bar'):
-                self.status_bar.showMessage(error_msg)
+        if self.pause_test:
+            # 暂停测试
+            self.progressbar_worker.pause()
+            self.pause_test_btn.setText("继续测试")
+            self.status_bar.showMessage('当前任务已暂停，点击继续执行')
+            self.rologger.log("测试已暂停")
+        else:
+            # 恢复测试
+            self.progressbar_worker.resume()
+            self.pause_test_btn.setText("暂停测试")
+            self.status_bar.showMessage('当前任务已恢复执行')
+            self.rologger.log("测试已恢复")
 
     def on_stop_test(self):
-        """停止测试"""
-        # 严格的安全检查 - 防止未初始化就点击导致崩溃
-        try:
-            # 1. 检查是否有 executeScriptWorker 属性
-            if not hasattr(self, 'executeScriptWorker'):
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        self.rologger.log(f'on_stop_test')
 
-            # 2. 检查 executeScriptWorker 是否有效
-            if self.executeScriptWorker is None:
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        if self.executeScriptWorker is None:
+            self.status_bar.showMessage('当前没有在执行的任务')
+            return
 
-            # 3. 检查是否在运行
-            if not self.executeScriptWorker.isRunning():
-                self.status_bar.showMessage('当前没有在执行的任务')
-                return
+        self.stop_test = True
+        self.pause_test = True
+        OperateSharedData.write(stop_test=True, pause_test=True)
 
-            # 记录日志
-            if hasattr(self, 'rologger') and self.rologger is not None:
-                self.rologger.log(f'on_stop_test')
+        self.status_bar.showMessage("正在停止任务...")
+        self.progressbar_worker.stop()
 
-            # 1. 设置状态
-            self.stop_test = True
-            self.pause_test = True
-            OperateSharedData.write(stop_test=True, pause_test=True)
+        def _on_task_finished(title, result):
+            self.on_test_finished_auto()
+            self.status_bar.showMessage("当前任务已停止")
+            self.stop_test = False
+            self.pause_test = False
+            # 用完断开信号，避免重复触发
+            self.executeScriptWorker.finished_with_script_result.disconnect(_on_task_finished)
 
-            self.status_bar.showMessage("正在停止任务...")
-
-            # 添加空值检查，防止未加载脚本就点击停止导致崩溃
-            if hasattr(self, 'progressbar_worker') and self.progressbar_worker is not None:
-                self.progressbar_worker.stop()
-
-            # 2. 线程结束后自动回调（不阻塞、不闪退）
-            def _on_task_finished(title, result):
-                self.on_test_finished_auto()
-                self.status_bar.showMessage("当前任务已停止")
-                self.stop_test = False
-                self.pause_test = False
-                # 用完断开信号，避免重复触发
-                self.executeScriptWorker.finished_with_script_result.disconnect(_on_task_finished)
-
-            # 3. 绑定信号 + 触发停止
-            self.executeScriptWorker.finished_with_script_result.connect(_on_task_finished)
-            self.executeScriptWorker.stop_task()
-
-        except Exception as e:
-            # 捕获所有异常，防止崩溃
-            error_msg = f'停止测试异常：{e}'
-            print(error_msg)
-            if hasattr(self, 'status_bar'):
-                self.status_bar.showMessage(error_msg)
+        self.executeScriptWorker.finished_with_script_result.connect(_on_task_finished)
+        self.executeScriptWorker.stop_task()
 
     def on_load_script(self):
         self.rologger.log(f'on_load_script')
