@@ -49,6 +49,7 @@ class RoHandTestWindow(QMainWindow):
         super().__init__(parent)
 
         # ===== 全局变量 =====
+        self.last_port_refresh_time = 0
         self.is_refresh_port = False
         self.protocol_type = 0
         self.port_names_all = ['无可用端口'] # 获取的所有接测试设备的端口列表
@@ -450,8 +451,17 @@ class RoHandTestWindow(QMainWindow):
 
     def start_port_refresh(self):
         self.rologger.log(f'start_port_refresh')
+        current_time = time.time()
+        if current_time - self.last_port_refresh_time < 5:
+            self.rologger.log(f"端口刷新过于频繁，请等待5秒后再试")
+            self.status_bar.showMessage(f"操作频繁，请5秒后再刷新端口")
+            return
+
         if self.is_refresh_port:
             return
+
+        self.last_port_refresh_time = current_time
+        
         self.is_refresh_port = True
         self.set_controls_enabled(False)
         #情况布局文件
