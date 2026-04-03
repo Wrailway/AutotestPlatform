@@ -198,7 +198,14 @@ class RohanManager:
             self.port = None
             return False
 
-    def mb_read_register(self, address, count, device_id):
+    def delete_client(self):
+        logger.error(f'delete_client')
+        if self.client:
+            self.client.disconnect()
+            self.client = None
+
+
+    def read_registers(self, address, count, device_id):
         """
         Modbus 读保持寄存器
         :param address: 起始地址
@@ -223,7 +230,7 @@ class RohanManager:
             logger.error(f'[port = {self.port}]读寄存器异常: {str(e)}')
             return None
 
-    def mb_write_register(self, address, value, device_id):
+    def write_registers(self, address, value, device_id):
         """
         Modbus 写多个寄存器
         :param address: 起始地址
@@ -276,7 +283,7 @@ class RohanManager:
             return sw_version
 
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            response = self.mb_read_register(address=self.ROH_FW_VERSION, count=2, device_id=device_id)
+            response = self.read_registers(address=self.ROH_FW_VERSION, count=2, device_id=device_id)
             if response is not None:
                 sw_version = self._format_version(response)
         else:
@@ -309,7 +316,7 @@ class RohanManager:
             return False
 
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            return self.mb_write_register(address=self.ROH_FINGER_POS_TARGET0, value=gesture, device_id=device_id)
+            return self.write_registers(address=self.ROH_FINGER_POS_TARGET0, value=gesture, device_id=device_id)
         else:
             all_success = True
             for finger_id in range(MAX_MOTOR_CNT):
@@ -334,7 +341,7 @@ class RohanManager:
             return None
 
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            response = self.mb_read_register(address=self.ROH_FINGER_POS_TARGET0, count=6, device_id=device_id)
+            response = self.read_registers(address=self.ROH_FINGER_POS_TARGET0, count=6, device_id=device_id)
             return response if response is not None else None
         else:
             positions = [0] * MAX_MOTOR_CNT
@@ -360,7 +367,7 @@ class RohanManager:
             return None
 
         if self.protocol_type == self.MODBUS_PROTOCOL:
-            response = self.mb_read_register(address=self.ROH_FINGER_CURRENT0, count=6, device_id=device_id)
+            response = self.read_registers(address=self.ROH_FINGER_CURRENT0, count=6, device_id=device_id)
             return response if response is not None else None
         else:
             currents = [0] * MAX_MOTOR_CNT
@@ -394,7 +401,7 @@ class RohanManager:
                 info = self._get_single_port_device_info(port)
                 if info:
                     device_info_list.append(info)
-                    logger.info(f"【成功】{port} -> ID:{info['device_id']} 版本:{info['sw_version']}")
+                    logger.info(f"【成功】{port} -> ID:{info['设备ID']} 版本:{info['软件版本']}")
                 else:
                     logger.warning(f"【无设备】{port}")
             except Exception as e:
@@ -416,7 +423,7 @@ class RohanManager:
         for device_id in range(2, self.MAX_ID):
             try:
                 if self.protocol_type == self.MODBUS_PROTOCOL:
-                    response = self.mb_read_register(self.ROH_FW_VERSION, 2, device_id)
+                    response = self.read_registers(address=self.ROH_FW_VERSION, count=2, device_id=device_id)
                     if response is not None:
                         sw_version = self._format_version(response)
                         return build_device_info(
@@ -438,6 +445,8 @@ class RohanManager:
                 logger.debug(f"端口 {port} 检测设备ID {device_id} 失败：{e}")
                 continue
 
+        # self.delete_client()
+
         return None
 
 
@@ -452,18 +461,18 @@ if __name__ == "__main__":
     # 1. 实例验证
     print("\n【测试1：实例验证】")
     manager1 = RohanManager(RohanManager.PEAK_CAN_PROTOCOL)
-    manager2 = RohanManager(RohanManager.MODBUS_PROTOCOL)
-    print(f"manager1 内存地址: {id(manager1)}")
-    print(f"manager2 内存地址: {id(manager2)}")
-    print(f"是否为同一个实例: {manager1 is manager2}")
+    # manager2 = RohanManager(RohanManager.MODBUS_PROTOCOL)
+    # print(f"manager1 内存地址: {id(manager1)}")
+    # print(f"manager2 内存地址: {id(manager2)}")
+    # print(f"是否为同一个实例: {manager1 is manager2}")
     print(f"manager1 协议类型: {manager1.protocol_type} (0=Modbus, 1=CAN)")
-    print(f"manager2 协议类型: {manager2.protocol_type}")
+    # print(f"manager2 协议类型: {manager2.protocol_type}")
 
     # 2. 配置文件操作
     print("\n【测试2：配置文件操作】")
     config_path = RohanManager.get_configfile_path()
     print(f"配置文件路径: {config_path}")
-    protocol_type = RohanManager.read_config_value(section="protocol_type", key="protocol", default=0)
+    protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
     print(f"读取配置项: {protocol_type}")
     protocol_section = RohanManager.read_config_section(section="protocol_type")
     print(f"读取配置段: {protocol_section}")
@@ -481,7 +490,7 @@ if __name__ == "__main__":
         create_ok = modbus_manager.create_client(test_modbus_port)
         print(f"创建 Modbus 客户端: {'成功' if create_ok else '失败'}")
         if create_ok:
-            read_data = modbus_manager.mb_read_register(address=1001, count=2, device_id=2)
+            read_data = modbus_manager.read_registers(address=1001, count=2, device_id=2)
             print(f"读固件版本寄存器返回数据: {read_data}")
             fw_version = modbus_manager.get_firmware_version(device_id=2)
             print(f"获取固件版本: {fw_version}")

@@ -41,6 +41,9 @@ class Aging_test:
     ROH_FINGER_CURRENT0 = 1105
     DEFAULT_SPEED = 255
     action_interval  = 1
+    device_id = 0
+    port = None
+    protocol_type = 0
 
     def __init__(self, protocol_type, port, device_id):
         self.protocol_type = protocol_type
@@ -87,7 +90,7 @@ class Aging_test:
 
     def close(self):
         try:
-            if self.rohan_manager:
+            if self.rohan_manager and self.rohan_manager.client:
                 self.rohan_manager.client.disconnect()
         except Exception as e:
             logger.error(f'异常关闭端口{e}')
@@ -225,4 +228,5 @@ def build_gesture_result(timestamp, content, result, comment):
 
 
 if __name__ == "__main__":
-    main(ports=['PCAN_USBBUS1'], devices_ids=[2], aging_duration=0.01)
+    # main(ports=['PCAN_USBBUS1'], devices_ids=[2], aging_duration=0.01)
+    main(ports=['COM4'], devices_ids=[2], aging_duration=0.01)

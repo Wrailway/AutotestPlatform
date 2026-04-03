@@ -1004,10 +1004,14 @@ class DeviceInfosWorker(QThread):
     def run(self):
         try:
             protocol_type = int(RohanManager.read_config_value(section="protocol_type", key="protocol", default=0))
-            ports = RohanManager(protocol_type).read_port_info()
-            device_infos = RohanManager(protocol_type).get_device_info_list(ports)
+            manager = RohanManager(protocol_type)
+            ports = manager.read_port_info()
+            device_infos = manager.get_device_info_list(ports)
+            manager.delete_client()
             self.finished_with_device_infos.emit(device_infos)
-        except Exception:
+        except Exception as e:
+            print(f'DeviceInfosWorker ,发生异常{str(e)}')
+            self.finished_with_device_infos.emit([])
             self.finished_with_device_infos.emit([])
 
 
@@ -1053,6 +1057,7 @@ class ExecuteScriptWorker(QThread):
             self.finished_with_script_result.emit(report_title, overall_result)
 
         except Exception as e:
+            print(f'ExecuteScriptWorker发生异常{str(e)}')
             if self._is_stopped:
                 self.finished_with_script_result.emit("任务已停止", [])
             else:

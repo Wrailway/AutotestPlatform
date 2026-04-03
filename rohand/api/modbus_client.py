@@ -5,21 +5,13 @@ Modbus 协议客户端实现
 继承抽象接口 ABSApiClient，完成串口 Modbus 连接、断开、寄存器读写、错误解析等封装
 """
 import logging
-import time
-from typing import Optional, List
+from typing import Optional
 
 from pymodbus import FramerType
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ConnectionException
 
-from rohand.api.OHandSerialAPI import OHandSerialAPI
 from rohand.api.abs_api_client import ABSApiClient
-
-# 兼容 serial 模块导入
-try:
-    import serial.tools.list_ports
-except Exception:
-    serial = None
 
 # ==============================
 # 日志配置
@@ -39,7 +31,6 @@ class ModbusClient(ABSApiClient):
 
     # 客户端对象
     serialClient = None
-    _ohand_api: Optional[OHandSerialAPI] = None
 
     # 寄存器常量
     ROH_FW_VERSION = 1001
@@ -118,64 +109,9 @@ class ModbusClient(ABSApiClient):
             try:
                 self.serialClient.close()
                 self.serialClient = None
-                self._ohand_api = None
                 logger.info(f"[port = {self.port}] Connection to Modbus device closed.")
             except Exception as e:
                 logger.error(f"[port = {self.port}] Error during teardown: {e}")
-
-    @staticmethod
-    def list_available_ports() -> List[str]:
-        """
-        扫描并返回系统可用串口列表
-        自动过滤蓝牙虚拟串口
-        :return: 可用串口列表
-        """
-        if not serial:
-            return []
-
-        ports = []
-        for port_info in serial.tools.list_ports.comports():
-            if not port_info.device:
-                continue
-            desc = (port_info.description or "").upper()
-            if "BLUETOOTH" in desc:
-                continue
-            ports.append(port_info.device)
-        return ports
-
-    def _get_underlying_serial(self):
-        """
-        获取 pymodbus 底层串口对象
-        避免同一端口重复打开导致占用
-        :return: 底层 serial 对象
-        """
-        if not self.serialClient:
-            return None
-        return getattr(self.serialClient, "socket", None) or getattr(self.serialClient, "serial", None)
-
-    @staticmethod
-    def _get_milli_seconds_impl() -> int:
-        """获取毫秒级时间戳（供 API 层使用）"""
-        return int(time.time() * 1000)
-
-    @staticmethod
-    def _delay_milli_seconds_impl(ms: int):
-        """毫秒级延时函数（供 API 层使用）"""
-        time.sleep(max(0, ms) / 1000.0)
-
-    @staticmethod
-    def _uart_send_data_impl(addr, data, length, context):
-        """
-        与 OHandSerialAPI 兼容的发送接口
-        :param context: 底层串口对象
-        """
-        if context is None:
-            return 1
-        try:
-            context.write(bytes(data[:length]))
-            return 0
-        except Exception:
-            return 1
 
     def get_exception(self, response, node_id=2) -> str:
         """
