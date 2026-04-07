@@ -8,6 +8,7 @@
 import configparser
 import os
 import logging
+import time
 from datetime import datetime
 
 import can
@@ -205,13 +206,14 @@ class RohanManager:
             self.client = None
 
 
-    def read_registers(self, address, count, device_id):
+    def read_registers(self, address, count, device_id=2):
         """
         Modbus 读保持寄存器
         :param address: 起始地址
         :param count: 寄存器数量
         :param device_id: 从机地址
         """
+        time.sleep(0.5)
         if self.protocol_type != self.MODBUS_PROTOCOL or not self.client:
             logger.error("Modbus客户端未初始化，无法读寄存器")
             return None
@@ -230,7 +232,7 @@ class RohanManager:
             logger.error(f'[port = {self.port}]读寄存器异常: {str(e)}')
             return None
 
-    def write_registers(self, address, value, device_id):
+    def write_registers(self, address, value, device_id=2):
         """
         Modbus 写多个寄存器
         :param address: 起始地址
@@ -245,6 +247,7 @@ class RohanManager:
             response = self.client.serialClient.write_registers(
                 address=address, values=value, device_id=device_id
             )
+            time.sleep(0.5)
             if not response.isError():
                 logger.info(f'[port = {self.port}]写寄存器成功: 地址={address}, 值={value}')
                 return True
