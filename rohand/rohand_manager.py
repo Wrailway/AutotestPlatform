@@ -49,6 +49,7 @@ class RohanManager:
     device_id = None
     MAX_ID = 247
     protocol_type = 0
+    action_interval = 0
 
     def __init__(self, protocol_type):
         """
@@ -213,7 +214,7 @@ class RohanManager:
         :param count: 寄存器数量
         :param device_id: 从机地址
         """
-        time.sleep(0.5)
+        time.sleep(self.action_interval)
         if self.protocol_type != self.MODBUS_PROTOCOL or not self.client:
             logger.error("Modbus客户端未初始化，无法读寄存器")
             return None
@@ -247,7 +248,7 @@ class RohanManager:
             response = self.client.serialClient.write_registers(
                 address=address, values=value, device_id=device_id
             )
-            time.sleep(0.5)
+            time.sleep(self.action_interval)
             if not response.isError():
                 logger.info(f'[port = {self.port}]写寄存器成功: 地址={address}, 值={value}')
                 return True
