@@ -137,7 +137,7 @@ class TestRunnerThread(QThread):
 # ====================== 原有主窗口（已集成稳定引擎） ======================
 # ---------------------------------------------------------------------------
 
-class APPTestWindow(QMainWindow):
+class AppTestWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
