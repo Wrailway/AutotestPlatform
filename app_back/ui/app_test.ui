@@ -1,0 +1,894 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AppTestWindow</class>
+ <widget class="QMainWindow" name="AppTestWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1600</width>
+    <height>900</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>APP应用自动化测试</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+QMainWindow {
+	background-color: #f0f2f5;
+}
+QGroupBox {
+	font-weight: bold;
+	border: 1px solid #dcdfe6;
+	border-radius: 4px;
+	margin-top: 10px;
+	background-color: #ffffff;
+}
+QGroupBox::title {
+	subcontrol-origin: margin;
+	subcontrol-position: top left;
+	padding: 0 5px;
+	left: 10px;
+	color: #606266;
+}
+QTableWidget {
+	border: none;
+	gridline-color: #ebeef5;
+	selection-background-color: #409eff;
+}
+QHeaderView::section {
+	background-color: #f5f7fa;
+	border: none;
+	border-right: 1px solid #ebeef5;
+	border-bottom: 1px solid #ebeef5;
+	height: 30px;
+	color: #909399;
+}
+/* 通用按钮样式 (会被下方特定ID覆盖) */
+QPushButton {
+	background-color: #ffffff;
+	border: 1px solid #dcdfe6;
+	border-radius: 4px;
+	padding: 5px 15px;
+	color: #606266;
+}
+QPushButton:hover {
+	color: #409eff;
+	border-color: #c6e2ff;
+	background-color: #ecf5ff;
+}
+QTextEdit {
+	border: 1px solid #dcdfe6;
+	border-radius: 4px;
+	background-color: #fafafa;
+	font-family: &quot;Consolas&quot;, &quot;Courier New&quot;, monospace;
+}
+
+/* ================= 底部面板新样式 (New Pro Style) ================= */
+
+/* 底部容器背景 */
+#bottom_panel {
+	background-color: #ffffff;
+	border-top: 1px solid #e4e7ed;
+}
+
+/* --- 控制按钮区域 --- */
+/* 主开始按钮 - Hero Button */
+#start_btn {
+	background-color: #409eff;
+	color: white;
+	border: none;
+	border-radius: 6px;
+	font-size: 14px;
+	font-weight: bold;
+	padding: 8px 20px;
+}
+#start_btn:hover {
+	background-color: #66b1ff;
+}
+#start_btn:pressed {
+	background-color: #3a8ee6;
+}
+
+/* 停止按钮 - 危险色 */
+#stop_btn {
+	background-color: #fef0f0;
+	color: #f56c6c;
+	border: 1px solid #fbc4c4;
+	border-radius: 6px;
+}
+#stop_btn:hover {
+	background-color: #f56c6c;
+	color: white;
+}
+
+/* 暂停按钮 */
+#pause_btn {
+	border-radius: 6px;
+}
+
+/* --- 进度条区域 --- */
+QProgressBar {
+	border: 1px solid #c0c4cc;
+	background-color: #ffffff;
+	border-radius: 4px;
+	text-align: center;
+	color: #303133;
+	font-family: Arial;
+	font-size: 13px;
+}
+QProgressBar::chunk {
+	background-color: #9ec6fc;
+	border-radius: 3px;
+	margin: 1px;
+}
+/* 状态文字 */
+#label_status {
+	color: #909399;
+	font-size: 12px;
+}
+#label_percent {
+	color: #409eff;
+	font-weight: bold;
+	font-family: Arial;
+}
+
+/* --- 结果仪表盘区域 (KPI Cards) --- */
+/* 数字大字体 */
+.stat_number {
+	font-family: &quot;Segoe UI&quot;, Arial, sans-serif;
+	font-size: 26px;
+	font-weight: bold;
+	background: transparent;
+}
+/* 标签小字体 */
+.stat_label {
+	font-size: 12px;
+	color: #909399;
+	font-weight: bold;
+}
+/* 颜色定义 */
+#stat_num_total { color: #303133; }
+#stat_num_pass { color: #67c23a; }
+#stat_num_fail { color: #f56c6c; }
+#stat_num_skip { color: #e6a23c; } /* 新增跳过颜色 */
+
+</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="main_layout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>15</number>
+    </property>
+    <property name="topMargin">
+     <number>15</number>
+    </property>
+    <property name="rightMargin">
+     <number>15</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <layout class="QHBoxLayout" name="top_horizontalLayout" stretch="5,3,2">
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <item>
+       <widget class="QGroupBox" name="group_case">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>5</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title">
+         <string>测试任务队列 (Test Cases)</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <property name="contentsMargins" stdset="0">
+          <rect>
+           <x>10</x>
+           <y>10</y>
+           <width>0</width>
+           <height>0</height>
+          </rect>
+         </property>
+         <item>
+          <widget class="QTableWidget" name="case_table">
+           <property name="alternatingRowColors">
+            <bool>true</bool>
+           </property>
+           <property name="selectionBehavior">
+            <enum>QAbstractItemView::SelectRows</enum>
+           </property>
+           <attribute name="horizontalHeaderStretchLastSection">
+            <bool>true</bool>
+           </attribute>
+           <column>
+            <property name="text">
+             <string>ID</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>用例名称</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>状态</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="group_log">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>3</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title">
+         <string>实时执行日志 (Runtime Log)</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <property name="contentsMargins" stdset="0">
+          <rect>
+           <x>10</x>
+           <y>10</y>
+           <width>0</width>
+           <height>0</height>
+          </rect>
+         </property>
+         <item>
+          <widget class="QTextEdit" name="log_text">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+           <property name="html">
+            <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Consolas','Courier New','monospace'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Consolas'; color:#888888;&quot;&gt;[System] 等待任务启动...&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_2">
+           <item>
+            <widget class="QCheckBox" name="chk_auto_scroll">
+             <property name="text">
+              <string>自动滚动</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_3">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="copy_btn">
+             <property name="text">
+              <string>复制</string>
+             </property>
+             <property name="icon">
+              <iconset theme="edit-copy">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="save_btn">
+             <property name="text">
+              <string>保存</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-save">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="clear_btn">
+             <property name="text">
+              <string>清空</string>
+             </property>
+             <property name="icon">
+              <iconset theme="edit-clear">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="group_config">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>2</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title">
+         <string>配置面板 (Settings)</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <property name="contentsMargins" stdset="0">
+          <rect>
+           <x>10</x>
+           <y>10</y>
+           <width>0</width>
+           <height>0</height>
+          </rect>
+         </property>
+         <item>
+          <layout class="QFormLayout" name="formLayout">
+           <property name="verticalSpacing">
+            <number>15</number>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_device">
+             <property name="text">
+              <string>目标设备:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="device_combo">
+             <item>
+              <property name="text">
+               <string>Android Emulator (Default)</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_interval">
+             <property name="text">
+              <string>操作间隔(s):</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="interval_combo">
+             <item>
+              <property name="text">
+               <string>2s</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>5s</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>10s</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>15s</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_count">
+             <property name="text">
+              <string>循环次数:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="count_combo">
+             <item>
+              <property name="text">
+               <string>1次</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>10次</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>30次</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>50次</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="label_type">
+             <property name="text">
+              <string>测试策略:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QComboBox" name="test_type_combo">
+             <item>
+              <property name="text">
+               <string>标准功能测试</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Monkey 压力测试</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QFrame" name="bottom_panel">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>110</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>110</height>
+       </size>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="spacing">
+        <number>25</number>
+       </property>
+       <property name="leftMargin">
+        <number>20</number>
+       </property>
+       <property name="topMargin">
+        <number>15</number>
+       </property>
+       <property name="rightMargin">
+        <number>20</number>
+       </property>
+       <property name="bottomMargin">
+        <number>15</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="layout_controls">
+         <property name="spacing">
+          <number>15</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="start_btn">
+           <property name="minimumSize">
+            <size>
+             <width>130</width>
+             <height>45</height>
+            </size>
+           </property>
+           <property name="cursor">
+            <cursorShape>PointingHandCursor</cursorShape>
+           </property>
+           <property name="text">
+            <string> 开始测试</string>
+           </property>
+           <property name="icon">
+            <iconset theme="media-playback-start">
+             <normaloff>.</normaloff>.</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="layout_mini_btns">
+           <property name="spacing">
+            <number>5</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="pause_btn">
+             <property name="minimumSize">
+              <size>
+               <width>80</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="cursor">
+              <cursorShape>PointingHandCursor</cursorShape>
+             </property>
+             <property name="text">
+              <string>暂停</string>
+             </property>
+             <property name="icon">
+              <iconset theme="media-playback-pause">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="stop_btn">
+             <property name="minimumSize">
+              <size>
+               <width>80</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="cursor">
+              <cursorShape>PointingHandCursor</cursorShape>
+             </property>
+             <property name="text">
+              <string>停止</string>
+             </property>
+             <property name="icon">
+              <iconset theme="media-playback-stop">
+               <normaloff>.</normaloff>.</iconset>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="line_sep_1">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QVBoxLayout" name="layout_progress">
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="layout_prog_text">
+           <item>
+            <widget class="QLabel" name="label_status">
+             <property name="text">
+              <string>等待指令...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_percent">
+             <property name="text">
+              <string></string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QProgressBar" name="progressBar">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>26</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>26</height>
+            </size>
+           </property>
+           <property name="value">
+            <number>0</number>
+           </property>
+           <property name="textVisible">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="line_sep_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="layout_dashboard">
+         <property name="spacing">
+          <number>25</number>
+         </property>
+         <item>
+          <layout class="QVBoxLayout" name="box_total">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="stat_num_total">
+             <property name="class" stdset="0">
+              <string>stat_number</string>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="stat_lbl_total">
+             <property name="class" stdset="0">
+              <string>stat_label</string>
+             </property>
+             <property name="text">
+              <string>TOTAL</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="box_pass">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="stat_num_pass">
+             <property name="class" stdset="0">
+              <string>stat_number</string>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="stat_lbl_pass">
+             <property name="class" stdset="0">
+              <string>stat_label</string>
+             </property>
+             <property name="text">
+              <string>PASS</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="box_fail">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="stat_num_fail">
+             <property name="class" stdset="0">
+              <string>stat_number</string>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="stat_lbl_fail">
+             <property name="class" stdset="0">
+              <string>stat_label</string>
+             </property>
+             <property name="text">
+              <string>FAIL</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <!-- 新增的跳过数据面板 -->
+         <item>
+          <layout class="QVBoxLayout" name="box_skip">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="stat_num_skip">
+             <property name="class" stdset="0">
+              <string>stat_number</string>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="stat_lbl_skip">
+             <property name="class" stdset="0">
+              <string>stat_label</string>
+             </property>
+             <property name="text">
+              <string>SKIP</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <!-- 新增结束 -->
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1280</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>文件(File)</string>
+    </property>
+    <addaction name="actionLoadScript"/>
+    <addaction name="actionExportReport"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuConfig">
+    <property name="title">
+     <string>配置(Settings)</string>
+    </property>
+    <addaction name="open_config"/>
+   </widget>
+   <widget class="QMenu" name="menuOptions">
+    <property name="title">
+     <string>选项(Options)</string>
+    </property>
+    <addaction name="actionTheme"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>帮助(Help)</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuConfig"/>
+   <addaction name="menuOptions"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <action name="actionLoadScript">
+   <property name="icon">
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>加载脚本</string>
+   </property>
+  </action>
+  <action name="actionExportReport">
+   <property name="icon">
+    <iconset theme="document-save">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>导出报告</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="icon">
+    <iconset theme="application-exit">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="open_config">
+   <property name="text">
+    <string>配置文件</string>
+   </property>
+  </action>
+  <action name="actionTheme">
+   <property name="icon">
+    <iconset theme="preferences-desktop-theme">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>切换主题</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="icon">
+    <iconset theme="help-about">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>关于</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
