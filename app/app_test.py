@@ -84,7 +84,7 @@ class PytestRunnerPlugin:
     def pytest_runtest_setup(self, item):
         row = self.node_mapping.get(item.nodeid)
         if row is not None:
-            self.log_signal.emit({"level": "sys", "msg": f"开始执行: {item.name}"})
+            self.log_signal.emit({"level": "INFO", "msg": f"开始执行: {item.name}"})
             self.status_signal.emit(row, "RUNNING")
 
     def pytest_runtest_logreport(self, report):
@@ -255,7 +255,7 @@ class APPTestWindow(QMainWindow):
         self.rologger.log("开始执行自动化测试...")
 
         self.runner_thread = TestRunnerThread(self.current_script_path, self.case_node_mapping)
-        # self.runner_thread.sig_log.connect(self.log_from_engine)
+        self.runner_thread.sig_log.connect(self.log_from_engine)
         self.runner_thread.sig_status.connect(self.update_case_status)
         self.runner_thread.sig_finished.connect(self.on_test_all_finished)
         self.runner_thread.start()
@@ -263,7 +263,7 @@ class APPTestWindow(QMainWindow):
     def log_from_engine(self, log):
         level = log.get("level", "info")
         msg = log.get("msg")
-        self.rologger.log(msg, level=level.upper())
+        print(msg)
 
     def update_case_status(self, row, status):
         item = self.test_data_table.item(row, 2)
