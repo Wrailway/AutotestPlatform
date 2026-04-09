@@ -38,7 +38,7 @@ class APPManager:
     @staticmethod
     def fmt_log(message: str) -> str:
         """统一日志格式"""
-        return f"[{APPhanManager._ts()}] {message}"
+        return f"[{APPManager._ts()}] {message}"
 
     # ==============================
     # 配置文件操作 API
@@ -60,7 +60,7 @@ class APPManager:
         :param default: 默认值
         """
         if not config_path:
-            config_path = APPhanManager.get_configfile_path()
+            config_path = APPManager.get_configfile_path()
 
         if not os.path.isfile(config_path) or not section or not key:
             logger.warning(f"配置文件不存在或参数缺失: {config_path} | {section} | {key}")
@@ -82,7 +82,7 @@ class APPManager:
         :param section: 配置段名称
         """
         if not config_path:
-            config_path = APPhanManager.get_configfile_path()
+            config_path = APPManager.get_configfile_path()
 
         if not os.path.isfile(config_path) or not section:
             logger.warning(f"配置文件不存在或section缺失: {config_path} | {section}")
