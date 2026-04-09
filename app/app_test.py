@@ -398,9 +398,6 @@ class AppTestWindow(QMainWindow):
         self.rologger.log("✅ 测试已完全停止")
 
     def update_case_status(self, row, status):
-        if self.stop_test:
-            return
-
         item = self.test_data_table.item(row, 2)
         total = self.test_data_table.rowCount()
 
