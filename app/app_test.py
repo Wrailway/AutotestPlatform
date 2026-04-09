@@ -8,19 +8,16 @@ import subprocess
 import sys
 import os
 import time
-import importlib
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import pytest
-from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.styles.fonts import Font
 from openpyxl.utils import get_column_letter
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
-    QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QCheckBox,
+    QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout,
     QDialog, QLabel, QStyledItemDelegate, QTextEdit, QDialogButtonBox
 )
 from PyQt5.QtWidgets import QMenu, QAction
@@ -33,19 +30,26 @@ from app.app_logger import APPHandLogger
 from app.app_manager import APPManager
 from app.app_theme import apply_black_style, apply_green_style, apply_default_style
 
+
 # ---------------------------------------------------------------------------
-# ====================== 【稳定版】pytest 自动化测试引擎 ======================
+# ====================== 【终极修复版】pytest 自动化测试引擎 ======================
 # ---------------------------------------------------------------------------
 
-# 用例收集插件
+# 用例收集插件：收集时就记录 index，不再依赖 nodeid
 class PytestCollectPlugin:
     def __init__(self):
         self.collected_items = []
 
     def pytest_collection_modifyitems(self, session, config, items):
-        for item in items:
+        for idx, item in enumerate(items):
             doc = item.obj.__doc__.strip() if item.obj.__doc__ else item.name
-            self.collected_items.append({"nodeid": item.nodeid, "name": doc})
+            # 把 index 一起存进去，这是关键修复
+            self.collected_items.append({
+                "index": idx,
+                "nodeid": item.nodeid,
+                "name": doc
+            })
+
 
 # 用例收集线程
 class TestCollectorThread(QThread):
@@ -70,42 +74,42 @@ class TestCollectorThread(QThread):
         except Exception as e:
             self.sig_error.emit(str(e))
 
-# 执行插件
+
+# 执行插件：用 index 绑定，彻底解决第一条匹配不到问题
 class PytestRunnerPlugin:
-    def __init__(self, log_signal, status_signal, node_mapping):
+    def __init__(self, log_signal, status_signal, node_to_index):
         self.log_signal = log_signal
         self.status_signal = status_signal
-        self.node_mapping = node_mapping
+        self.node_to_index = node_to_index  # nodeid -> index
 
     @pytest.fixture
     def logger(self):
         return lambda msg: self.log_signal.emit({"level": "info", "msg": str(msg)})
 
     def pytest_runtest_setup(self, item):
-        row = self.node_mapping.get(item.nodeid)
-        if row is not None:
+        idx = self.node_to_index.get(item.nodeid)
+        if idx is not None:
             self.log_signal.emit({"level": "INFO", "msg": f"开始执行: {item.name}"})
-            self.status_signal.emit(row, "RUNNING")
+            self.status_signal.emit(idx, "RUNNING")
 
     def pytest_runtest_logreport(self, report):
-        row = self.node_mapping.get(report.nodeid)
-        if not row:
+        idx = self.node_to_index.get(report.nodeid)
+        if idx is None:
             return
 
-        if report.skipped:
-            self.status_signal.emit(row, "SKIP")
-            msg = report.longreprtext.splitlines()[-1] if report.longreprtext else "条件跳过"
-            self.log_signal.emit({"level": "skip", "msg": f"用例跳过: {report.nodeid} [{msg}]"})
+        if report.when != "call":
             return
 
-        if report.when == "call":
-            if report.passed:
-                self.status_signal.emit(row, "PASS")
-                self.log_signal.emit({"level": "success", "msg": f"用例通过: {report.nodeid}"})
-            elif report.failed:
-                err = report.longreprtext.splitlines()[-1] if report.longreprtext else "未知错误"
-                self.status_signal.emit(row, "FAIL")
-                self.log_signal.emit({"level": "error", "msg": f"用例失败: {err}"})
+        if report.passed:
+            self.status_signal.emit(idx, "PASS")
+            self.log_signal.emit({"level": "success", "msg": f"用例[{idx+1}]通过"})
+        elif report.failed:
+            self.status_signal.emit(idx, "FAIL")
+            self.log_signal.emit({"level": "error", "msg": f"用例[{idx+1}]失败"})
+        elif report.skipped:
+            self.status_signal.emit(idx, "SKIP")
+            self.log_signal.emit({"level": "skip", "msg": f"用例[{idx+1}]跳过"})
+
 
 # 执行线程
 class TestRunnerThread(QThread):
@@ -113,16 +117,18 @@ class TestRunnerThread(QThread):
     sig_status = pyqtSignal(int, str)
     sig_finished = pyqtSignal()
 
-    def __init__(self, script_path, node_mapping, parent=None):
+    def __init__(self, script_path, node_to_index, parent=None):
         super().__init__(parent)
         self.script_path = script_path
-        self.node_mapping = node_mapping
+        self.node_to_index = node_to_index
 
     def run(self):
         try:
-            plugin = PytestRunnerPlugin(self.sig_log, self.sig_status, self.node_mapping)
+            plugin = PytestRunnerPlugin(self.sig_log, self.sig_status, self.node_to_index)
             pytest.main([
                 "-q",
+                "-s",
+                "--tb=short",
                 "-p", "no:logging",
                 "-p", "no:faulthandler",
                 "-p", "no:cacheprovider",
@@ -133,8 +139,9 @@ class TestRunnerThread(QThread):
         finally:
             self.sig_finished.emit()
 
+
 # ---------------------------------------------------------------------------
-# ====================== 原有主窗口（已集成稳定引擎） ======================
+# ====================== 主窗口 ======================
 # ---------------------------------------------------------------------------
 
 class AppTestWindow(QMainWindow):
@@ -144,17 +151,11 @@ class AppTestWindow(QMainWindow):
         self.selected_operate_interval = 1
         self.selected_execute_times = 1
         self.test_data_table = None
-        self.script_loaded = False
         self.script_path = None
-        self.script_name = None
-        self.report_title = None
-        self.raw_test_data = None
         self.stop_test = False
         self.pause_test = False
 
-        # 新增：pytest 引擎变量
-        self.current_script_path = None
-        self.case_node_mapping = {}
+        self.node_to_index = {}  # nodeid -> index
         self.executed_cases_count = 0
         self.collector_thread = None
         self.runner_thread = None
@@ -173,7 +174,6 @@ class AppTestWindow(QMainWindow):
         self._init_ui_widgets()
         self._bind_all_events()
         self._init_manager()
-        self.closeEvent = self.close_event_handler
 
     # ------------------------------------------------------------------
     # 加载脚本
@@ -189,11 +189,9 @@ class AppTestWindow(QMainWindow):
         if not file_path:
             return
 
-        self.current_script_path = file_path
         self.script_path = file_path
-        self.script_name = file_path
         self.test_data_table.setRowCount(0)
-        self.case_node_mapping.clear()
+        self.node_to_index.clear()
 
         self.rologger.log(f"正在解析脚本：{file_path}")
         self.start_test_btn.setEnabled(False)
@@ -204,18 +202,19 @@ class AppTestWindow(QMainWindow):
         self.collector_thread.start()
 
     def render_cases_to_table(self, cases):
-        self.rologger.log(f'render_cases_to_table')
         cnt = len(cases)
         if cnt == 0:
             self.rologger.log("未发现测试用例！", level="ERROR")
             self.start_test_btn.setEnabled(True)
             return
 
-        for row, item in enumerate(cases):
-            self.test_data_table.insertRow(row)
-            self.case_node_mapping[item["nodeid"]] = row
+        for item in cases:
+            row = item["index"]
+            nodeid = item["nodeid"]
+            self.node_to_index[nodeid] = row  # 建立映射
 
-            id_item = QTableWidgetItem(str(row+1))
+            self.test_data_table.insertRow(row)
+            id_item = QTableWidgetItem(str(f'用例{row+1}'))
             id_item.setTextAlignment(Qt.AlignCenter)
             self.test_data_table.setItem(row, 0, id_item)
 
@@ -240,9 +239,12 @@ class AppTestWindow(QMainWindow):
     # 开始测试
     # ------------------------------------------------------------------
     def on_start_test(self):
-        if not self.current_script_path or self.test_data_table.rowCount() == 0:
+        if not self.script_path or self.test_data_table.rowCount() == 0:
             QMessageBox.warning(self, "提示", "请先加载测试脚本！")
             return
+
+        # 调用抽离的函数：重置所有用例状态为待测试
+        self.reset_all_case_status()
 
         self.start_test_btn.setEnabled(False)
         self.success_case_value.setText("0条")
@@ -254,16 +256,30 @@ class AppTestWindow(QMainWindow):
         self.rologger.log("=" * 50)
         self.rologger.log("开始执行自动化测试...")
 
-        self.runner_thread = TestRunnerThread(self.current_script_path, self.case_node_mapping)
+        self.runner_thread = TestRunnerThread(self.script_path, self.node_to_index)
         self.runner_thread.sig_log.connect(self.log_from_engine)
         self.runner_thread.sig_status.connect(self.update_case_status)
         self.runner_thread.sig_finished.connect(self.on_test_all_finished)
         self.runner_thread.start()
 
+    def reset_all_case_status(self):
+        """
+        重置表格中所有测试用例的结果为：待测试
+        """
+        row_count = self.test_data_table.rowCount()
+        result_column_index = 2
+
+        for row in range(row_count):
+            item = self.test_data_table.item(row, result_column_index)
+            if item:
+                item.setText("待测试")
+                # 重置文字颜色为黑色（可选）
+                item.setForeground(QBrush(Qt.black))
+
     def log_from_engine(self, log):
-        level = log.get("level", "info")
         msg = log.get("msg")
-        print(msg)
+        if msg:
+            print(msg)
 
     def update_case_status(self, row, status):
         item = self.test_data_table.item(row, 2)
@@ -276,17 +292,17 @@ class AppTestWindow(QMainWindow):
             item.setText("通过")
             item.setForeground(QBrush(QColor("#67C23A")))
             v = self.success_case_value.text().replace("条", "")
-            self.success_case_value.setText(f"{int(v)+1}条")
+            self.success_case_value.setText(f"{int(v) + 1}条")
         elif status == "FAIL":
             item.setText("失败")
             item.setForeground(QBrush(QColor("#F56C6C")))
             v = self.fail_case_value.text().replace("条", "")
-            self.fail_case_value.setText(f"{int(v)+1}条")
+            self.fail_case_value.setText(f"{int(v) + 1}条")
         elif status == "SKIP":
             item.setText("跳过")
             item.setForeground(QBrush(QColor("#E6A23C")))
             v = self.skip_case_value.text().replace("条", "")
-            self.skip_case_value.setText(f"{int(v)+1}条")
+            self.skip_case_value.setText(f"{int(v) + 1}条")
 
         if status in ["PASS", "FAIL", "SKIP"]:
             self.executed_cases_count += 1
@@ -299,10 +315,9 @@ class AppTestWindow(QMainWindow):
         self.rologger.log("✅ 所有用例执行完毕！")
 
     # ------------------------------------------------------------------
-    # 原有代码不变
+    # UI 基础
     # ------------------------------------------------------------------
-
-    def close_event_handler(self, event):
+    def closeEvent(self, event):
         event.accept()
 
     def setMenuItemStyle(self, menu: QMenu):
@@ -342,10 +357,11 @@ class AppTestWindow(QMainWindow):
         self.test_data_table.setRowCount(0)
         self.test_data_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.test_data_table.setItemDelegate(self.CenterAlignDelegate())
+        self.test_data_table.verticalHeader().setVisible(False)
 
         self.test_progress_bar.setRange(0, 100)
         self.test_progress_bar.setValue(0)
-        self.test_progress_bar.setStyleSheet("QProgressBar { color: #000000; font-weight: bold; }")
+        self.test_progress_bar.setStyleSheet("QProgressBar { color: #000; font-weight: bold; }")
 
         self.total_case_value.setText("0条")
         self.success_case_value.setText("0条")
@@ -379,7 +395,6 @@ class AppTestWindow(QMainWindow):
         self.action_about.triggered.connect(self.on_about)
 
     def _init_manager(self):
-        print('_init_manager')
         self.rologger = APPHandLogger(self.log_text_edit)
 
     def on_test_type_changed(self, checked):
@@ -391,7 +406,6 @@ class AppTestWindow(QMainWindow):
             self.rologger.log("当前选中：Monkey 测试")
 
     def on_execute_times_selected(self, text):
-        self.rologger.log('on_execute_times_selected')
         try:
             times_value = float(text.replace("次", ""))
             self.rologger.log(f"已选择 执行次数：{text}")
@@ -400,21 +414,18 @@ class AppTestWindow(QMainWindow):
             self.rologger.log(f"选择执行次数异常：{e}")
 
     def on_operate_interval_selected(self, text):
-        self.rologger.log('on_operate_interval_selected')
         try:
             interval_value = float(text.replace("秒", ""))
             self.rologger.log(f"已选择 操作间隔：{text}")
             self.selected_operate_interval = interval_value
         except Exception as e:
-            self.rologger.log(f"选择执行次数异常：{e}")
+            self.rologger.log(f"选择间隔异常：{e}")
 
     def on_copy_log(self):
-        self.rologger.log('on_copy_log')
         self.log_text_edit.selectAll()
         self.log_text_edit.copy()
 
     def on_clear_log(self):
-        self.rologger.log('on_clear_log')
         self.log_text_edit.clear()
 
     def on_save_log(self):
@@ -430,7 +441,6 @@ class AppTestWindow(QMainWindow):
                 self.rologger.log(f"日志保存失败：{str(e)}", level="ERROR")
 
     def on_log_level_clicked(self):
-        self.rologger.log(f"on_log_level_clicked")
         menu = QMenu(self)
         self.setMenuItemStyle(menu)
         log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
@@ -452,45 +462,23 @@ class AppTestWindow(QMainWindow):
         except Exception as e:
             self.rologger.log(f"设置日志级别失败：{str(e)}")
 
-    def update_test_datas_table(self):
-        self.rologger.log('update_test_datas_table')
-
-    def get_row_by_port(self, port):
-        for row in range(self.test_data_table.rowCount()):
-            item = self.test_data_table.item(row, 0)
-            if item and item.text() == port:
-                return row
-        return -1
-
-    def _on_device_info_update(self, device_info_test):
-        self.rologger.log('_on_device_info_update')
-
-    def update_table_column_by_port(self, port, column_index, value):
-        self.rologger.log('update_table_column_by_port')
-
-    def set_controls_enabled(self, enabled):
-        controls = [self.start_test_btn, self.pause_test_btn, self.stop_test_btn]
-        for control in controls:
-            control.setEnabled(enabled)
-
     def on_pause_test(self):
-        self.rologger.log('on_pause_test')
+        self.rologger.log('暂停测试')
 
     def on_stop_test(self):
-        self.rologger.log(f'on_stop_test')
+        self.rologger.log('停止测试')
 
     def on_export_report(self):
-        self.rologger.log(f'on_export_report')
+        self.rologger.log('导出测试报告')
 
     def on_view_config(self):
-        self.rologger.log(f'on_view_config')
         config_path = APPManager.get_configfile_path()
         if not os.path.exists(config_path):
             QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
             self.rologger.log(f"配置文件不存在：{config_path}")
             return
         try:
-            with open(config_path, 'r', encoding='UTF-8') as f:
+            with open(config_path, 'r', encoding="UTF-8") as f:
                 content = f.read()
             dialog = QDialog(self)
             dialog.setWindowTitle("查看配置文件")
@@ -503,7 +491,7 @@ class AppTestWindow(QMainWindow):
             text_edit.setStyleSheet("""
                 QTextEdit {
                     background-color: white;
-                    color: #333333;
+                    color: #333;
                     border: 2px solid #d1d5db;
                     border-radius: 6px;
                     padding: 8px;
@@ -522,14 +510,13 @@ class AppTestWindow(QMainWindow):
             self.rologger.log(f"读取配置文件失败：{str(e)}")
 
     def on_edit_config(self):
-        self.rologger.log(f'on_edit_config')
         config_path = APPManager.get_configfile_path()
         if not os.path.exists(config_path):
             QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
             self.rologger.log(f"配置文件不存在：{config_path}")
             return
         try:
-            with open(config_path, 'r', encoding='UTF-8') as f:
+            with open(config_path, 'r', encoding="UTF-8") as f:
                 content = f.read()
             dialog = QDialog(self)
             dialog.setWindowTitle("修改配置文件")
@@ -544,7 +531,7 @@ class AppTestWindow(QMainWindow):
             text_edit.setStyleSheet("""
                 QTextEdit {
                     background-color: white;
-                    color: #333333;
+                    color: #333;
                     border: 2px solid #d1d5db;
                     border-radius: 6px;
                     padding: 8px;
@@ -568,13 +555,14 @@ class AppTestWindow(QMainWindow):
 
     def _save_config_and_restart(self, config_path, content, dialog):
         try:
-            with open(config_path, 'w', encoding='UTF-8') as f:
+            with open(config_path, 'w', encoding="UTF-8") as f:
                 f.write(content)
             self.rologger.log(f"配置文件已保存：{config_path}")
             QMessageBox.information(self, "成功", "配置文件已保存，应用程序将自动重启...")
             dialog.accept()
             script_path = os.path.abspath(sys.argv[0])
-            subprocess.Popen([sys.executable, script_path], start_new_session=True, creationflags=subprocess.DETACHED_PROCESS if os.name == 'nt' else 0)
+            subprocess.Popen([sys.executable, script_path], start_new_session=True,
+                             creationflags=subprocess.DETACHED_PROCESS if os.name == 'nt' else 0)
             time.sleep(0.5)
             QApplication.quit()
         except Exception as e:
@@ -582,56 +570,25 @@ class AppTestWindow(QMainWindow):
             self.rologger.log(f"保存配置文件失败：{str(e)}")
 
     def on_theme_black(self):
-        self.rologger.log("on_theme_black")
+        self.rologger.log("切换至黑色主题")
         apply_black_style(self)
 
     def on_theme_green(self):
-        self.rologger.log("on_theme_green")
+        self.rologger.log("切换至绿色主题")
         apply_green_style(self)
 
     def on_theme_default(self):
-        self.rologger.log(f"on_theme_default")
+        self.rologger.log("恢复默认主题")
         apply_default_style(self)
 
     def on_about(self):
-        self.rologger.log(f"on_about")
         QMessageBox.about(self, "关于", "灵巧手自动化测试工具 v1.0\n基于PyQt5开发")
 
-# ---------------------------------------------------------------------------
-# 线程类
-# ---------------------------------------------------------------------------
-
-class DeviceInfosWorker(QThread):
-    finished_with_device_infos = pyqtSignal(list)
-    def run(self): print(f'run')
-
-class ExecuteScriptWorker(QThread):
-    finished_with_script_result = pyqtSignal(str, list)
-    def __init__(self, ports: list, device_ids: list, aging_duration: float, script_path: str, parent=None):
-        super().__init__(parent)
-        self.script_path = script_path
-        self._is_stopped = False
-    def run(self): print(f'run')
-    def stop_task(self): self._is_stopped = True
-
-class ProgressBarWorker(QThread):
-    progress_update = pyqtSignal(int)
-    finished_signal = pyqtSignal()
-    def __init__(self, duration, parent=None):
-        super().__init__(parent)
-        self.total_test_seconds = max(duration, 1)
-        self.is_running = True
-        self.is_paused = False
-        self.delay = 0.0
-    def run(self): pass
-    def pause(self): self.is_paused = True
-    def resume(self): self.is_paused = False
-    def stop(self): self.is_running = False
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    win = APPTestWindow()
+    win = AppTestWindow()
     win.setWindowTitle("应用自动化测试界面")
     win.show()
     sys.exit(app.exec_())
