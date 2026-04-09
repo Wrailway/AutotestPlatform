@@ -5,6 +5,7 @@ import random
 import math
 import os
 from datetime import datetime
+from app.app_common import OperateSharedData
 
 # 随机延时，让用例运行更慢（模拟真实接口/业务耗时）
 def random_sleep():
@@ -41,6 +42,38 @@ def file_simulate_write(content):
     random_sleep()
     return len(content) > 0
 
+# 每条用例执行前自动检查
+def check_control():
+    # 每次用例执行前读取全局状态
+    stop_test, pause_test = OperateSharedData.read()
+
+    # 优化点1：先检查是否要停止
+    if stop_test:
+        print('测试已停止')
+        pytest.exit("测试进程已停止")  # pytest 必须用 exit，不能用 break
+
+    # 优化点2：阻塞式暂停（直到恢复 或 收到停止）
+    delay = 0.0
+    while pause_test:
+        time.sleep(0.2)
+        delay += 0.2
+        stop_test, pause_test = OperateSharedData.read()
+
+        # 暂停期间也能响应停止
+        if stop_test:
+            print.info('测试已停止')
+            pytest.exit("测试进程已停止")
+
+    # 退出循环后再检查一次
+    stop_test, _ = OperateSharedData.read()
+    if stop_test:
+        print.info('测试已停止')
+        pytest.exit("测试进程已停止")
+
+@pytest.fixture(autouse=True)
+def auto_check():
+    check_control()
+    
 # ========================= 25条 成功用例 =========================
 def test_success_01():
     assert complex_calculate(3) == pytest.approx(6 + 14 + 1.386)

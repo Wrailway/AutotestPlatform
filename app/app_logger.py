@@ -46,7 +46,7 @@ class APPHandLogger:
         if self.log_enable == 'n':
             return
 
-        logger = logging.getLogger("rohand")
+        logger = logging.getLogger("APP")
         if level == 'DEBUG':
             logger.debug(message)
         elif level == 'INFO':
