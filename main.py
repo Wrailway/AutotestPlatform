@@ -64,8 +64,8 @@ MODULE_MAPPING: Dict[str, Dict[str, str]] = {
         "class_name": "ModelTestUI"
     },
     "服务器测试": {
-        "module_path": "server_test_ui",
-        "class_name": "ServerTestUI"
+        "module_path": "server.server_test",
+        "class_name": "ServerTestWindow"
     }
 }
 
