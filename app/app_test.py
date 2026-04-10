@@ -13,7 +13,7 @@ from datetime import datetime
 import pytest
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.styles.fonts import Font
-from openpyxl.utils import get_column_letter
+from openpyxl import Workbook  # 补上缺失的导入
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QFileDialog,
@@ -482,7 +482,109 @@ class AppTestWindow(QMainWindow):
             self.rologger.log(f"设置日志级别失败：{str(e)}")
 
     def on_export_report(self):
-        self.rologger.log('导出测试报告')
+        """导出测试报告为Excel文件 —— 修复版：读取真实测试用例数据"""
+        row_count = self.test_data_table.rowCount()
+        if row_count == 0:
+            QMessageBox.warning(self, "提示", "请先加载脚本并执行测试，再导出报告！")
+            self.rologger.log("导出失败：未加载测试脚本或无测试数据")
+            return
+
+        self.rologger.log("开始导出测试报告...")
+
+        thin = Side(style='thin', color='000000')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        header_font = Font(bold=True, size=12)
+        title_font = Font(bold=True, size=16)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "灵巧手测试报告"
+
+        # ===================== 标题 =====================
+        ws.merge_cells('A1:C1')
+        ws['A1'] = "APP自动化测试报告"
+        ws['A1'].font = title_font
+        ws['A1'].alignment = center
+        ws.row_dimensions[1].height = 30
+
+        # ===================== 基础信息 =====================
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ws['A3'] = "测试时间"
+        ws['B3'] = now
+        ws['A4'] = "测试脚本"
+        ws['B4'] = os.path.basename(self.script_path) if self.script_path else "未选择"
+        ws['A5'] = "总用例数"
+        ws['B5'] = row_count
+
+        # 统计结果
+        success = int(self.success_case_value.text().replace("条", ""))
+        fail = int(self.fail_case_value.text().replace("条", ""))
+        skip = int(self.skip_case_value.text().replace("条", ""))
+        ws['A6'] = "通过"
+        ws['B6'] = success
+        ws['A7'] = "失败"
+        ws['B7'] = fail
+        ws['A8'] = "跳过"
+        ws['B8'] = skip
+
+        # ===================== 表头 =====================
+        headers = ["用例编号", "用例名称", "执行状态"]
+        ws.append([""])  # 空行
+        ws.append(headers)
+        header_row = 10
+        for col, value in enumerate(headers, 1):
+            cell = ws.cell(row=header_row, column=col, value=value)
+            cell.font = header_font
+            cell.alignment = center
+            cell.border = border
+
+        # ===================== 写入真实测试用例数据 =====================
+        for row in range(row_count):
+            case_id = self.test_data_table.item(row, 0).text() if self.test_data_table.item(row, 0) else ""
+            case_name = self.test_data_table.item(row, 1).text() if self.test_data_table.item(row, 1) else ""
+            case_status = self.test_data_table.item(row, 2).text() if self.test_data_table.item(row, 2) else ""
+
+            ws.append([case_id, case_name, case_status])
+
+            # 给状态上色（Excel里也显示颜色）
+            data_row = ws.max_row
+            status_cell = ws.cell(row=data_row, column=3)
+            if "通过" in case_status:
+                status_cell.font = Font(color="67C23A", bold=True)
+            elif "失败" in case_status:
+                status_cell.font = Font(color="F56C6C", bold=True)
+            elif "执行中" in case_status or "跳过" in case_status:
+                status_cell.font = Font(color="E6A23C", bold=True)
+
+        # ===================== 列宽/样式 =====================
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 50
+        ws.column_dimensions['C'].width = 15
+
+        for r in range(header_row, ws.max_row + 1):
+            for c in range(1, 4):
+                ws.cell(row=r, column=c).border = border
+                ws.cell(row=r, column=c).alignment = center
+
+        # ===================== 保存文件 =====================
+        os.makedirs("report", exist_ok=True)
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if self.script_path:
+            script_name = os.path.splitext(os.path.basename(self.script_path))[0]
+            filename = f"测试报告_{script_name}_{time_str}.xlsx"
+        else:
+            filename = f"测试报告_{time_str}.xlsx"
+
+        save_path = os.path.join("report", filename)
+
+        try:
+            wb.save(save_path)
+            self.rologger.log(f"报告导出成功：{save_path}")
+            QMessageBox.information(self, "导出成功", f"测试报告已保存至：\n{save_path}")
+        except Exception as e:
+            self.rologger.log(f"报告导出失败：{str(e)}", level="ERROR")
+            QMessageBox.critical(self, "导出失败", f"错误：{str(e)}")
 
     def on_view_config(self):
         config_path = APPManager.get_configfile_path()
