@@ -5,7 +5,7 @@ import random
 import math
 import os
 from datetime import datetime
-from app.app_common import OperateSharedData
+from server.server_common import OperateSharedData
 
 # 随机延时，让用例运行更慢（模拟真实接口/业务耗时）
 def random_sleep():
