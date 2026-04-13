@@ -253,13 +253,13 @@ class AppTestWindow(QMainWindow):
         self.action_about.triggered.connect(self.on_about)
 
     def _init_manager(self):
-        self.rologger = APPHandLogger(self.log_text_edit)
+        self.applogger = APPHandLogger(self.log_text_edit)
 
     # ------------------------------------------------------------------
     # 脚本加载
     # ------------------------------------------------------------------
     def on_load_script(self):
-        self.rologger.log(f"正在选择测试脚本...")
+        self.applogger.log(f"正在选择测试脚本...")
         base_dir = os.path.dirname(os.path.abspath(__file__))
         scripts_dir = os.path.join(base_dir, "scripts")
         if not os.path.exists(scripts_dir):
@@ -273,18 +273,18 @@ class AppTestWindow(QMainWindow):
         self.test_data_table.setRowCount(0)
         self.node_to_index.clear()
 
-        self.rologger.log(f"正在解析脚本：{file_path}")
+        self.applogger.log(f"正在解析脚本：{file_path}")
         self.start_test_btn.setEnabled(False)
 
         self.collector_thread = TestCollectorThread(file_path)
         self.collector_thread.sig_collected.connect(self.render_cases_to_table)
-        self.collector_thread.sig_error.connect(lambda e: self.rologger.log(f"解析失败：{e}", level="ERROR"))
+        self.collector_thread.sig_error.connect(lambda e: self.applogger.log(f"解析失败：{e}", level="ERROR"))
         self.collector_thread.start()
 
     def render_cases_to_table(self, cases):
         cnt = len(cases)
         if cnt == 0:
-            self.rologger.log("未发现测试用例！", level="ERROR")
+            self.applogger.log("未发现测试用例！", level="ERROR")
             self.start_test_btn.setEnabled(True)
             return
 
@@ -313,7 +313,7 @@ class AppTestWindow(QMainWindow):
         self.skip_case_value.setText("0条")
         self.test_progress_bar.setValue(0)
         self.start_test_btn.setEnabled(True)
-        self.rologger.log(f"脚本加载完成，共 {cnt} 条用例")
+        self.applogger.log(f"脚本加载完成，共 {cnt} 条用例")
 
     # ------------------------------------------------------------------
     # 开始 / 暂停 / 停止 / 状态更新
@@ -339,8 +339,8 @@ class AppTestWindow(QMainWindow):
         self.test_progress_bar.setValue(0)
         self.executed_cases_count = 0
 
-        self.rologger.log("=" * 50)
-        self.rologger.log("开始执行自动化测试...")
+        self.applogger.log("=" * 50)
+        self.applogger.log("开始执行自动化测试...")
 
         self.runner_thread = TestRunnerThread(self.script_path, self.node_to_index)
         self.runner_thread.sig_log.connect(self.log_from_engine)
@@ -359,7 +359,7 @@ class AppTestWindow(QMainWindow):
     def on_pause_test(self):
         if not self.runner_thread or not self.runner_thread.isRunning():
             self.status_bar.showMessage('当前无测试任务运行')
-            self.rologger.log("暂无运行中的测试任务")
+            self.applogger.log("暂无运行中的测试任务")
             return
 
         self.pause_test = not self.pause_test
@@ -369,19 +369,19 @@ class AppTestWindow(QMainWindow):
         if self.pause_test:
             self.pause_test_btn.setText("继续测试")
             self.status_bar.showMessage("测试已暂停 → 点击继续")
-            self.rologger.log("⏸️ 测试已暂停")
+            self.applogger.log("⏸️ 测试已暂停")
         else:
             self.pause_test_btn.setText("暂停测试")
             self.status_bar.showMessage("测试已恢复执行")
-            self.rologger.log("▶️ 测试已恢复")
+            self.applogger.log("▶️ 测试已恢复")
 
     def on_stop_test(self):
         if not self.runner_thread or not self.runner_thread.isRunning():
             self.status_bar.showMessage('当前无测试任务运行')
-            self.rologger.log("暂无运行中的测试任务")
+            self.applogger.log("暂无运行中的测试任务")
             return
 
-        self.rologger.log("🛑 正在停止测试...")
+        self.applogger.log("🛑 正在停止测试...")
         self.stop_test = True
         self.pause_test = True
 
@@ -395,7 +395,7 @@ class AppTestWindow(QMainWindow):
         self.start_test_btn.setEnabled(True)
 
         self.status_bar.showMessage("测试已停止")
-        self.rologger.log("✅ 测试已完全停止")
+        self.applogger.log("✅ 测试已完全停止")
 
     def update_case_status(self, row, status):
         item = self.test_data_table.item(row, 2)
@@ -435,7 +435,7 @@ class AppTestWindow(QMainWindow):
         self.start_test_btn.setEnabled(True)
         self.pause_test_btn.setEnabled(False)
         self.stop_test_btn.setEnabled(False)
-        self.rologger.log("✅ 所有用例执行完毕！")
+        self.applogger.log("✅ 所有用例执行完毕！")
 
     # ------------------------------------------------------------------
     # 工具函数
@@ -448,22 +448,22 @@ class AppTestWindow(QMainWindow):
         self.log_text_edit.clear()
 
     def on_save_log(self):
-        self.rologger.log("开始保存日志文件")
+        self.applogger.log("开始保存日志文件")
         filename = f"APP测试日志_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         fn, _ = QFileDialog.getSaveFileName(self, "保存日志", filename, "文本文件 (*.txt)")
         if fn:
             try:
                 with open(fn, "w", encoding="utf-8") as f:
                     f.write(self.log_text_edit.toPlainText())
-                self.rologger.log(f"日志保存成功：{os.path.basename(fn)}")
+                self.applogger.log(f"日志保存成功：{os.path.basename(fn)}")
             except Exception as e:
-                self.rologger.log(f"日志保存失败：{str(e)}", level="ERROR")
+                self.applogger.log(f"日志保存失败：{str(e)}", level="ERROR")
 
     def on_log_level_clicked(self):
         menu = QMenu(self)
         self.setMenuItemStyle(menu)
         log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
-        current_level = getattr(self.rologger, 'log_level', 'INFO')
+        current_level = getattr(self.applogger, 'log_level', 'INFO')
         for level in log_levels:
             action = QAction(level, self)
             if level == current_level:
@@ -476,20 +476,20 @@ class AppTestWindow(QMainWindow):
 
     def on_log_level_selected(self, level):
         try:
-            self.rologger.set_log_level(level)
-            self.rologger.log(f"日志级别已设置为：{level}")
+            self.applogger.set_log_level(level)
+            self.applogger.log(f"日志级别已设置为：{level}")
         except Exception as e:
-            self.rologger.log(f"设置日志级别失败：{str(e)}")
+            self.applogger.log(f"设置日志级别失败：{str(e)}")
 
     def on_export_report(self):
         """导出测试报告为Excel文件 —— 修复版：读取真实测试用例数据"""
         row_count = self.test_data_table.rowCount()
         if row_count == 0:
             QMessageBox.warning(self, "提示", "请先加载脚本并执行测试，再导出报告！")
-            self.rologger.log("导出失败：未加载测试脚本或无测试数据")
+            self.applogger.log("导出失败：未加载测试脚本或无测试数据")
             return
 
-        self.rologger.log("开始导出测试报告...")
+        self.applogger.log("开始导出测试报告...")
 
         thin = Side(style='thin', color='000000')
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -580,17 +580,17 @@ class AppTestWindow(QMainWindow):
 
         try:
             wb.save(save_path)
-            self.rologger.log(f"报告导出成功：{save_path}")
+            self.applogger.log(f"报告导出成功：{save_path}")
             QMessageBox.information(self, "导出成功", f"测试报告已保存至：\n{save_path}")
         except Exception as e:
-            self.rologger.log(f"报告导出失败：{str(e)}", level="ERROR")
+            self.applogger.log(f"报告导出失败：{str(e)}", level="ERROR")
             QMessageBox.critical(self, "导出失败", f"错误：{str(e)}")
 
     def on_view_config(self):
         config_path = APPManager.get_configfile_path()
         if not os.path.exists(config_path):
             QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
-            self.rologger.log(f"配置文件不存在：{config_path}")
+            self.applogger.log(f"配置文件不存在：{config_path}")
             return
         try:
             with open(config_path, 'r', encoding="UTF-8") as f:
@@ -612,16 +612,16 @@ class AppTestWindow(QMainWindow):
             layout.addWidget(button_box)
             dialog.setLayout(layout)
             dialog.exec_()
-            self.rologger.log(f"成功查看配置文件：{config_path}")
+            self.applogger.log(f"成功查看配置文件：{config_path}")
         except Exception as e:
             QMessageBox.critical(self, "错误", f"读取配置文件失败：{str(e)}")
-            self.rologger.log(f"读取配置文件失败：{str(e)}")
+            self.applogger.log(f"读取配置文件失败：{str(e)}")
 
     def on_edit_config(self):
         config_path = APPManager.get_configfile_path()
         if not os.path.exists(config_path):
             QMessageBox.warning(self, "警告", f"配置文件不存在：{config_path}")
-            self.rologger.log(f"配置文件不存在：{config_path}")
+            self.applogger.log(f"配置文件不存在：{config_path}")
             return
         try:
             with open(config_path, 'r', encoding="UTF-8") as f:
@@ -652,13 +652,13 @@ class AppTestWindow(QMainWindow):
             dialog.exec_()
         except Exception as e:
             QMessageBox.critical(self, "错误", f"编辑配置文件失败：{str(e)}")
-            self.rologger.log(f"编辑配置文件失败：{str(e)}")
+            self.applogger.log(f"编辑配置文件失败：{str(e)}")
 
     def _save_config_and_restart(self, config_path, content, dialog):
         try:
             with open(config_path, 'w', encoding="UTF-8") as f:
                 f.write(content)
-            self.rologger.log(f"配置文件已保存：{config_path}")
+            self.applogger.log(f"配置文件已保存：{config_path}")
             QMessageBox.information(self, "成功", "配置文件已保存，应用程序将自动重启...")
             dialog.accept()
             script_path = os.path.abspath(sys.argv[0])
@@ -668,44 +668,44 @@ class AppTestWindow(QMainWindow):
             QApplication.quit()
         except Exception as e:
             QMessageBox.critical(self, "错误", f"保存失败：{str(e)}")
-            self.rologger.log(f"保存配置文件失败：{str(e)}")
+            self.applogger.log(f"保存配置文件失败：{str(e)}")
 
     def on_test_type_changed(self, checked):
         if not checked:
             return
         if self.funtion_radio_button.isChecked():
-            self.rologger.log("当前选中：基本功能测试")
+            self.applogger.log("当前选中：基本功能测试")
         elif self.monkey_radio_button.isChecked():
-            self.rologger.log("当前选中：Monkey 测试")
+            self.applogger.log("当前选中：Monkey 测试")
 
     def on_execute_times_selected(self, text):
         try:
             times_value = int(float(text.replace("次", "").strip()))
-            self.rologger.log(f"已选择 执行次数：{text}")
+            self.applogger.log(f"已选择 执行次数：{text}")
             self.selected_execute_times = times_value
             OperateSharedData.write_params(execute_times=times_value)
         except Exception as e:
-            self.rologger.log(f"选择执行次数异常：{e}")
+            self.applogger.log(f"选择执行次数异常：{e}")
 
     def on_operate_interval_selected(self, text):
         try:
             interval_value = float(text.replace("秒", ""))
-            self.rologger.log(f"已选择 操作间隔：{text}")
+            self.applogger.log(f"已选择 操作间隔：{text}")
             self.selected_operate_interval = interval_value
             OperateSharedData.write_params(operate_interval=interval_value)
         except Exception as e:
-            self.rologger.log(f"选择间隔异常：{e}")
+            self.applogger.log(f"选择间隔异常：{e}")
 
     def on_theme_black(self):
-        self.rologger.log("切换至黑色主题")
+        self.applogger.log("切换至黑色主题")
         apply_black_style(self)
 
     def on_theme_green(self):
-        self.rologger.log("切换至绿色主题")
+        self.applogger.log("切换至绿色主题")
         apply_green_style(self)
 
     def on_theme_default(self):
-        self.rologger.log("恢复默认主题")
+        self.applogger.log("恢复默认主题")
         apply_default_style(self)
 
     def closeEvent(self, event):
