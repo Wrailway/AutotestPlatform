@@ -41,13 +41,14 @@ STATUS_UNKNOWN_DEVICE = "未识别设备"
 STATUS_READ_FAIL = "读取失败"
 STATUS_NOT_CONNECTED = "未连接"
 
-# 默认老化时间选项
+# 执行次数选项
 DEFAULT_EXECUTE_TIMES_OPTIONS = [
-    "1次", "5次", "20次", "50次", "100次"
+    "1次", "5次", "20次", "50次", "100次", "200次", "500次", "1000次", "2000次", "5000次", "10000次"
 ]
 
+#操作间隔选项
 DEFAULT_OPERATE_INTERVAL_OPTIONS = [
-    "1秒", "2秒","3秒","5秒", "10秒"
+    "1秒", "2秒","3秒","5秒", "10秒", "15秒", "20秒", "30秒", "45秒", "60秒"
 ]
 
 # 全局线程锁：保证多线程文件读写安全
@@ -67,48 +68,70 @@ def build_device_info(case_id, description, test_result=DEFAULT_TEST_RESULT):
 
 
 class OperateSharedData:
-    """
-    测试控制状态共享数据操作类
-    用于多线程间传递 停止测试/暂停测试 标志位
-    """
     _FILE = "shared_data.json"
 
+    # ===================== 【控制：停止 / 暂停】 =====================
     @classmethod
-    def write(cls, stop_test: bool, pause_test: bool):
-        """
-        写入共享测试状态
-        :param stop_test: 是否停止测试
-        :param pause_test: 是否暂停测试
-        """
+    def write_control(cls, stop_test: bool, pause_test: bool):
         with FILE_LOCK:
-            data = {"stop_test": stop_test, "pause_test": pause_test}
-            with open(cls._FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
+            data = cls._load_all()
+            data["stop_test"] = stop_test
+            data["pause_test"] = pause_test
+            cls._save_all(data)
 
     @classmethod
-    def read(cls):
+    def read_control(cls):
+        with FILE_LOCK:
+            data = cls._load_all()
+            return data.get("stop_test", False), data.get("pause_test", False)
+
+    # ===================== 【参数：执行次数 / 操作间隔】 =====================
+    @classmethod
+    def write_params(cls, execute_times: int = None, operate_interval: float = None):
         """
-        读取共享测试状态
-        :return: (stop_test, pause_test) 元组
+        支持单独写入任意一个参数
+        传哪个就更新哪个，不传就保持原有值，不影响、不覆盖
         """
         with FILE_LOCK:
-            try:
-                with open(cls._FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                stop = data.get("stop_test", False)
-                pause = data.get("pause_test", False)
-                return stop, pause
-            except Exception:
-                return False, False
+            data = cls._load_all()
+
+            # 只有传了值才更新，不传不碰
+            if execute_times is not None:
+                data["execute_times"] = execute_times
+            if operate_interval is not None:
+                data["operate_interval"] = operate_interval
+
+            cls._save_all(data)
+
+    @classmethod
+    def read_params(cls):
+        with FILE_LOCK:
+            data = cls._load_all()
+            return (
+                data.get("execute_times", 1),
+                data.get("operate_interval", 1.0)
+            )
+
+    # ===================== 内部工具 =====================
+    @classmethod
+    def _load_all(cls):
+        try:
+            with open(cls._FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+
+    @classmethod
+    def _save_all(cls, data):
+        with open(cls._FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
 
     @classmethod
     def delete_shared_data_file(cls):
-        """删除共享数据文件，异常安全，不抛出错误"""
-        file_path = cls._FILE
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception:
+            if os.path.exists(cls._FILE):
+                os.remove(cls._FILE)
+        except:
             pass

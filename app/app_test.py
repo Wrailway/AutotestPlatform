@@ -325,7 +325,7 @@ class AppTestWindow(QMainWindow):
 
         self.stop_test = False
         self.pause_test = False
-        OperateSharedData.write(stop_test=False, pause_test=False)
+        OperateSharedData.write_control(stop_test=False, pause_test=False)
         self.reset_all_case_status()
 
         self.start_test_btn.setEnabled(False)
@@ -364,7 +364,7 @@ class AppTestWindow(QMainWindow):
 
         self.pause_test = not self.pause_test
         self.runner_thread.set_pause(self.pause_test)
-        OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
+        OperateSharedData.write_control(stop_test=False, pause_test=self.pause_test)
 
         if self.pause_test:
             self.pause_test_btn.setText("继续测试")
@@ -387,7 +387,7 @@ class AppTestWindow(QMainWindow):
 
         self.runner_thread.set_pause(True)
         self.runner_thread.set_stop(True)
-        OperateSharedData.write(stop_test=True, pause_test=True)
+        OperateSharedData.write_control(stop_test=True, pause_test=True)
 
         self.pause_test_btn.setText("暂停测试")
         self.pause_test_btn.setEnabled(False)
@@ -680,9 +680,10 @@ class AppTestWindow(QMainWindow):
 
     def on_execute_times_selected(self, text):
         try:
-            times_value = float(text.replace("次", ""))
+            times_value = int(float(text.replace("次", "").strip()))
             self.rologger.log(f"已选择 执行次数：{text}")
             self.selected_execute_times = times_value
+            OperateSharedData.write_params(execute_times=times_value)
         except Exception as e:
             self.rologger.log(f"选择执行次数异常：{e}")
 
@@ -691,6 +692,7 @@ class AppTestWindow(QMainWindow):
             interval_value = float(text.replace("秒", ""))
             self.rologger.log(f"已选择 操作间隔：{text}")
             self.selected_operate_interval = interval_value
+            OperateSharedData.write_params(operate_interval=interval_value)
         except Exception as e:
             self.rologger.log(f"选择间隔异常：{e}")
 
