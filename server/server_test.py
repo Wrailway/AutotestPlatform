@@ -786,7 +786,13 @@ class ServerTestWindow(QMainWindow):
             option.displayAlignment = Qt.AlignCenter
 
     def on_about(self):
-        QMessageBox.about(self, "关于", "灵巧手自动化测试工具 v1.0\n基于PyQt5开发")
+        QMessageBox.about(
+            self,
+            "关于",
+            "服务器自动化测试工具 v1.0\n\n"
+            "基于 PyQt5 + pytest 开发\n"
+            "© 2026 上海傲意科技 All Rights Reserved."
+        )
 
 
 if __name__ == "__main__":
