@@ -26,7 +26,8 @@ from PyQt5.QtGui import QFont, QBrush, QColor
 from PyQt5.uic import loadUi
 
 from server.server_common import TABLE_HEADERS, DEFAULT_EXECUTE_TIMES_OPTIONS, DEFAULT_OPERATE_INTERVAL_OPTIONS, \
-    OperateSharedData
+    OperateSharedData, DEFAULT_OPERATE_ENVIRONMENT_OPTIONS, DEFAULT_NUM_OF_THREADS_OPTIONS, \
+    DEFAULT_NUM_OF_CONCURRENT_USERS_OPTIONS, DEFAULT_DURATION_OPTIONS, DEFAULT_RAMP_UP_OPTIONS, ENVIRONMENT_TEST
 from server.server_logger import ServerHandLogger
 from server.server_manager import ServerManager
 from server.server_theme import apply_black_style, apply_green_style, apply_default_style
@@ -166,6 +167,11 @@ class ServerTestWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.selected_ramp_up = 1
+        self.selected_duration = 3
+        self.selected_concurrent_users = 1
+        self.selected_threads_num = 1
+        self.selected_operate_environment = ENVIRONMENT_TEST
         self.selected_operate_interval = 1
         self.selected_execute_times = 1
         self.test_data_table = None
@@ -205,10 +211,22 @@ class ServerTestWindow(QMainWindow):
         self.log_text_edit.setReadOnly(True)
         self.log_text_edit.setFont(QFont("Consolas", 10))
 
+        self.operate_environment_combo.clear()
+        self.operate_environment_combo.addItems(DEFAULT_OPERATE_ENVIRONMENT_OPTIONS)
+
         self.execute_times_combo.clear()
         self.execute_times_combo.addItems(DEFAULT_EXECUTE_TIMES_OPTIONS)
         self.operate_interval_combo.clear()
         self.operate_interval_combo.addItems(DEFAULT_OPERATE_INTERVAL_OPTIONS)
+        self.threads_num_combo.clear()
+        self.threads_num_combo.addItems(DEFAULT_NUM_OF_THREADS_OPTIONS)
+
+        self.concurrent_users_combo.clear()
+        self.concurrent_users_combo.addItems(DEFAULT_NUM_OF_CONCURRENT_USERS_OPTIONS)
+        self.duration_combo.clear()
+        self.duration_combo.addItems(DEFAULT_DURATION_OPTIONS)
+        self.ramp_up_combo.clear()
+        self.ramp_up_combo.addItems(DEFAULT_RAMP_UP_OPTIONS)
 
         self.test_data_table = QTableWidget(self.test_data_group)
         self.test_data_table.setGeometry(10, 30, 800, 580)
@@ -229,8 +247,16 @@ class ServerTestWindow(QMainWindow):
         self.skip_case_value.setText("0条")
 
     def _bind_all_events(self):
+        self.operate_environment_combo.currentTextChanged.connect(self.on_operate_environment_selected)
+
         self.execute_times_combo.currentTextChanged.connect(self.on_execute_times_selected)
         self.operate_interval_combo.currentTextChanged.connect(self.on_operate_interval_selected)
+        self.threads_num_combo.currentTextChanged.connect(self.on_threads_num_selected)
+
+        self.concurrent_users_combo.currentTextChanged.connect(self.on_concurrent_users_selected)
+        self.duration_combo.currentTextChanged.connect(self.on_duration_selected)
+        self.ramp_up_combo.currentTextChanged.connect(self.on_ramp_up_selected)
+
         self.log_copy_btn.clicked.connect(self.on_copy_log)
         self.log_clear_btn.clicked.connect(self.on_clear_log)
         self.log_save_btn.clicked.connect(self.on_save_log)
@@ -238,9 +264,6 @@ class ServerTestWindow(QMainWindow):
         self.pause_test_btn.clicked.connect(self.on_pause_test)
         self.stop_test_btn.clicked.connect(self.on_stop_test)
         self.log_level_btn.clicked.connect(self.on_log_level_clicked)
-
-        self.funtion_radio_button.toggled.connect(self.on_test_type_changed)
-        self.monkey_radio_button.toggled.connect(self.on_test_type_changed)
 
         self.action_loadScript.triggered.connect(self.on_load_script)
         self.action_exportReport.triggered.connect(self.on_export_report)
@@ -325,7 +348,7 @@ class ServerTestWindow(QMainWindow):
 
         self.stop_test = False
         self.pause_test = False
-        OperateSharedData.write(stop_test=False, pause_test=False)
+        OperateSharedData.write_control(stop_test=False, pause_test=False)
         self.reset_all_case_status()
 
         self.start_test_btn.setEnabled(False)
@@ -364,7 +387,7 @@ class ServerTestWindow(QMainWindow):
 
         self.pause_test = not self.pause_test
         self.runner_thread.set_pause(self.pause_test)
-        OperateSharedData.write(stop_test=False, pause_test=self.pause_test)
+        OperateSharedData.write_control(stop_test=False, pause_test=self.pause_test)
 
         if self.pause_test:
             self.pause_test_btn.setText("继续测试")
@@ -387,7 +410,7 @@ class ServerTestWindow(QMainWindow):
 
         self.runner_thread.set_pause(True)
         self.runner_thread.set_stop(True)
-        OperateSharedData.write(stop_test=True, pause_test=True)
+        OperateSharedData.write_control(stop_test=True, pause_test=True)
 
         self.pause_test_btn.setText("暂停测试")
         self.pause_test_btn.setEnabled(False)
@@ -449,7 +472,7 @@ class ServerTestWindow(QMainWindow):
 
     def on_save_log(self):
         self.selogger.log("开始保存日志文件")
-        filename = f"APP测试日志_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        filename = f"服务器测试日志_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         fn, _ = QFileDialog.getSaveFileName(self, "保存日志", filename, "文本文件 (*.txt)")
         if fn:
             try:
@@ -670,13 +693,13 @@ class ServerTestWindow(QMainWindow):
             QMessageBox.critical(self, "错误", f"保存失败：{str(e)}")
             self.selogger.log(f"保存配置文件失败：{str(e)}")
 
-    def on_test_type_changed(self, checked):
-        if not checked:
-            return
-        if self.funtion_radio_button.isChecked():
-            self.selogger.log("当前选中：基本功能测试")
-        elif self.monkey_radio_button.isChecked():
-            self.selogger.log("当前选中：Monkey 测试")
+    def on_operate_environment_selected(self, text):
+        try:
+            environment_value = text
+            self.selogger.log(f"已选择 测试环境：{text}")
+            self.selected_operate_environment = environment_value
+        except Exception as e:
+            self.selogger.log(f"选择测试环境异常：{e}")
 
     def on_execute_times_selected(self, text):
         try:
@@ -693,6 +716,38 @@ class ServerTestWindow(QMainWindow):
             self.selected_operate_interval = interval_value
         except Exception as e:
             self.selogger.log(f"选择间隔异常：{e}")
+
+    def on_threads_num_selected(self, text):
+        try:
+            threads_num_value = int(text)
+            self.selogger.log(f"已选择 线程数：{text}")
+            self.selected_threads_num = threads_num_value
+        except Exception as e:
+            self.selogger.log(f"选择线程数异常：{e}")
+
+    def on_concurrent_users_selected(self, text):
+        try:
+            concurrent_users_value = int(text)
+            self.selogger.log(f"已选择 并发用户数：{text}")
+            self.selected_concurrent_users = concurrent_users_value
+        except Exception as e:
+            self.selogger.log(f"选择并发用户数异常：{e}")
+
+    def on_duration_selected(self, text):
+        try:
+            duration_value = int(text.replace("分钟", ""))
+            self.selogger.log(f"已选择 运行时间：{text}")
+            self.selected_duration = duration_value
+        except Exception as e:
+            self.selogger.log(f"选择运行时间异常：{e}")
+
+    def on_ramp_up_selected(self, text):
+        try:
+            ramp_up_value = int(text.replace("秒", ""))
+            self.selogger.log(f"已选择 爬坡时间：{text}")
+            self.selected_ramp_up = ramp_up_value
+        except Exception as e:
+            self.selogger.log(f"选择爬坡时间异常：{e}")
 
     def on_theme_black(self):
         self.selogger.log("切换至黑色主题")
