@@ -87,7 +87,7 @@ class OperateSharedData:
 
     # ===================== 【参数：执行次数 / 操作间隔】 =====================
     @classmethod
-    def write_params(cls, execute_times: int = None, operate_interval: float = None):
+    def write_params(cls, execute_times: int = None, operate_interval: int = None):
         """
         支持单独写入任意一个参数
         传哪个就更新哪个，不传就保持原有值，不影响、不覆盖
@@ -109,7 +109,7 @@ class OperateSharedData:
             data = cls._load_all()
             return (
                 data.get("execute_times", 1),
-                data.get("operate_interval", 1.0)
+                data.get("operate_interval", 1)
             )
 
     # ===================== 内部工具 =====================

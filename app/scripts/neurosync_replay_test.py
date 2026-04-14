@@ -11,7 +11,7 @@ def test_start_app():
     """启动应用"""
     global process
     process = subprocess.Popen(EXE_PATH)
-    time.sleep(3)
+    time.sleep(10)
     assert process.poll() is None, "应用启动失败"
 
 

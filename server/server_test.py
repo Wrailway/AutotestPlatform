@@ -698,22 +698,25 @@ class ServerTestWindow(QMainWindow):
             environment_value = text
             self.selogger.log(f"已选择 测试环境：{text}")
             self.selected_operate_environment = environment_value
+            OperateSharedData.write_environment_params(operate_environment=self.selected_operate_environment)
         except Exception as e:
             self.selogger.log(f"选择测试环境异常：{e}")
 
     def on_execute_times_selected(self, text):
         try:
-            times_value = float(text.replace("次", ""))
+            times_value = int(text.replace("次", ""))
             self.selogger.log(f"已选择 执行次数：{text}")
             self.selected_execute_times = times_value
+            OperateSharedData.write_fun_params(execute_times=self.selected_execute_times)
         except Exception as e:
             self.selogger.log(f"选择执行次数异常：{e}")
 
     def on_operate_interval_selected(self, text):
         try:
-            interval_value = float(text.replace("秒", ""))
+            interval_value = int(text.replace("秒", ""))
             self.selogger.log(f"已选择 操作间隔：{text}")
             self.selected_operate_interval = interval_value
+            OperateSharedData.write_fun_params(operate_interval=self.selected_operate_interval)
         except Exception as e:
             self.selogger.log(f"选择间隔异常：{e}")
 
@@ -722,6 +725,7 @@ class ServerTestWindow(QMainWindow):
             threads_num_value = int(text)
             self.selogger.log(f"已选择 线程数：{text}")
             self.selected_threads_num = threads_num_value
+            OperateSharedData.write_fun_params(threads_num=self.selected_threads_num)
         except Exception as e:
             self.selogger.log(f"选择线程数异常：{e}")
 
@@ -730,6 +734,7 @@ class ServerTestWindow(QMainWindow):
             concurrent_users_value = int(text)
             self.selogger.log(f"已选择 并发用户数：{text}")
             self.selected_concurrent_users = concurrent_users_value
+            OperateSharedData.write_perf_params(concurrent_user_nums=self.selected_concurrent_users)
         except Exception as e:
             self.selogger.log(f"选择并发用户数异常：{e}")
 
@@ -738,6 +743,7 @@ class ServerTestWindow(QMainWindow):
             duration_value = int(text.replace("分钟", ""))
             self.selogger.log(f"已选择 运行时间：{text}")
             self.selected_duration = duration_value
+            OperateSharedData.write_perf_params(duration=self.selected_duration)
         except Exception as e:
             self.selogger.log(f"选择运行时间异常：{e}")
 
@@ -746,6 +752,7 @@ class ServerTestWindow(QMainWindow):
             ramp_up_value = int(text.replace("秒", ""))
             self.selogger.log(f"已选择 爬坡时间：{text}")
             self.selected_ramp_up = ramp_up_value
+            OperateSharedData.write_perf_params(ramp_up=self.selected_ramp_up)
         except Exception as e:
             self.selogger.log(f"选择爬坡时间异常：{e}")
 

@@ -689,7 +689,7 @@ class AppTestWindow(QMainWindow):
 
     def on_operate_interval_selected(self, text):
         try:
-            interval_value = float(text.replace("秒", ""))
+            interval_value = int(text.replace("秒", ""))
             self.applogger.log(f"已选择 操作间隔：{text}")
             self.selected_operate_interval = interval_value
             OperateSharedData.write_params(operate_interval=interval_value)

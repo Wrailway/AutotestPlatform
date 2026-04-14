@@ -129,7 +129,7 @@ class OperateSharedData:
 
     # ===================== 【功能测试参数：执行次数 / 操作间隔 / 线程数】 =====================
     @classmethod
-    def write_fun_params(cls, execute_times: int = None, operate_interval: float = None, threads_num: int = None):
+    def write_fun_params(cls, execute_times: int = None, operate_interval: int = None, threads_num: int = None):
         """
         支持单独写入任意一个参数
         传哪个就更新哪个，不传就保持原有值
@@ -150,7 +150,7 @@ class OperateSharedData:
             data = cls._load_all()
             return (
                 data.get("execute_times", 1),
-                data.get("operate_interval", 1.0),
+                data.get("operate_interval", 1),
                 data.get("threads_num", 1)
             )
 
