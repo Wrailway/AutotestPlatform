@@ -14,22 +14,18 @@ import subprocess
 from pywinauto import Application, mouse
 from pywinauto.findwindows import find_window, ElementNotFoundError
 from pywinauto.timings import wait_until_passes
+import psutil
 
 from app.app_common import OperateSharedData
 
 # ========================= 配置参数 =========================
 UI_TIMIEOUT = 3
-TEST_DURATION = 12 * 3600
-CYCLE_INTERVAL = 10
-GLOBAL_CASE_INTERVAL = 3  # 全局统一用例间隔（秒）
-
 CONFIG = {
     "APP_PATH": r"D:\Program Files\NeuroSync\Replay3",
     "FILE_DIR": r"D:\edfx\V25OB3000test20250924191457\V25OB3000test20250924191457",
     "DAO_LIAN_INDEX": 0,
     "SWEEP_SPEED_RANGE": range(0, 22),
     "SENSITIVITY_RANGE": range(0, 16),
-    # "HIGH_PASS_RANGE": range(0, 11),
     "LOW_PASS_RANGE": range(0, 6),
     "PLAYBACK_SPEED_RANGE": range(0, 8),
     "MAX_DOWN_RETRIES": 5,
@@ -180,33 +176,48 @@ def drag_progress_in_cycles(main_window, progress_bar_auto_id, cycles=5):
 def check_stop_pause():
     stop, pause = OperateSharedData.read_control()
     if stop:
+        print("\n🛑 检测到停止信号，退出测试")
         pytest.exit("测试已停止")
     while pause:
-        time.sleep(0.2)
-        stop, pause = OperateSharedData.read_control()
-        if stop:
-            pytest.exit("测试已停止")
+        print("⏸️ 测试暂停中...")
+        for _ in range(10):
+            time.sleep(0.2)
+            stop, pause = OperateSharedData.read_control()
+            if stop:
+                pytest.exit("测试已停止")
+        check_stop_pause()
+
+# 全局参数
+execute_times = 1
+operate_interval = 1
+
+def refresh_params():
+    global execute_times, operate_interval
+    execute_times, operate_interval = OperateSharedData.read_params()
+    print(f"\n🔄 刷新参数：执行次数 = {execute_times}，间隔 = {operate_interval}s")
 
 # ========================= 全局自动启动 & 加载文件 =========================
 app_instance = None
 main_window = None
+PROCESS_PID = None
 
 @pytest.fixture(scope="session", autouse=True)
 def run_app_and_load_file():
-    global app_instance, main_window
+    global app_instance, main_window, PROCESS_PID
     from pywinauto import actionlogger
     actionlogger.ActionLogger.log = lambda *args, **kwargs: None
 
     print("\n==============================================")
     print("✅ 启动应用并加载文件...")
     print("==============================================\n")
-
     app_dir = CONFIG['APP_PATH']
     exe_files = [f for f in os.listdir(app_dir) if f.lower().endswith(".exe")]
     assert len(exe_files) > 0, "未找到EXE"
     exe_path = os.path.join(app_dir, exe_files[0])
 
-    subprocess.Popen([exe_path], creationflags=subprocess.CREATE_NO_WINDOW)
+    # 启动并记录PID
+    proc = subprocess.Popen([exe_path], creationflags=subprocess.CREATE_NO_WINDOW)
+    PROCESS_PID = proc.pid
     time.sleep(8)
 
     app_instance = Application(backend="uia").connect(title_re="NeuroSync Replay.*", timeout=30)
@@ -238,17 +249,57 @@ def run_app_and_load_file():
     print("\n✅ 全部用例完成，关闭应用")
     try:
         main_window.close()
+        time.sleep(2)
     except:
-        try:
-            app_instance.kill()
-        except:
-            pass
+        pass
 
-# ========================= 全局统一用例间隔 =========================
+    # 强杀进程（绝对能关掉）
+    try:
+        p = psutil.Process(PROCESS_PID)
+        p.kill()
+        print("✅ 进程已强杀关闭")
+    except:
+        pass
+
 @pytest.fixture(autouse=True)
 def global_interval():
-    time.sleep(GLOBAL_CASE_INTERVAL)
-    check_stop_pause()
+    yield
+    refresh_params()         # 刷新执行次数、间隔
+    time.sleep(operate_interval)  # 👈 这就是 用例之间的间隔
+    check_stop_pause()       # 检查暂停/停止
+
+# ========================= 统一用例入口（支持 N 次循环） =========================
+def run_all_test_cases():
+    test_verify_paras()
+    test_verify_exe()
+    test_play_start()
+    test_close_video_playback()
+    test_enable_0_2s_line()
+    test_channel_selection()
+    test_random_config_parameters()
+    test_navigation_buttons_operation()
+    test_drag_progress_bar()
+    test_random_add_tags()
+
+# ========================= 主测试函数（支持配置文件次数） =========================
+@pytest.mark.skip('暂时跳过压力测试')
+def test_main_auto_run():
+    refresh_params()
+    print(f"\n🚀 开始执行测试，总次数：{execute_times}")
+
+    for i in range(1, execute_times + 1):
+        check_stop_pause()
+        print(f"\n=====================================")
+        print(f"📌 第 {i}/{execute_times} 轮测试开始")
+        print(f"=====================================\n")
+
+        run_all_test_cases()
+
+        print(f"\n✅ 第 {i} 轮执行完成")
+        refresh_params()
+        time.sleep(operate_interval)
+
+    print("\n🎉 所有轮次全部执行完毕！")
 
 # ========================= 测试用例 =========================
 def test_verify_paras():
@@ -275,7 +326,7 @@ def test_close_video_playback():
             safe_set_focus(video_window)
             close_btn = video_window.child_window(control_type="Button", title='关闭')
             close_btn.wait("enabled", timeout=UI_TIMIEOUT)
-            close_btn.click()
+            close_btn.click_input()
             print("✅ Video Playback 窗口已关闭")
         else:
             print("✅ Video Playback 窗口未出现，无需关闭")
@@ -292,7 +343,7 @@ def test_channel_selection():
     btn_cl = main_window.child_window(auto_id="btn_cl", control_type="Button", found_index=0)
     btn_cl.wait("enabled", timeout=UI_TIMIEOUT)
     safe_set_focus(btn_cl)
-    btn_cl.click_input()  # 👈 物理点击
+    btn_cl.click_input()
     time.sleep(3)
     print("✅ 展开通道列表")
 
@@ -301,17 +352,15 @@ def test_channel_selection():
     safe_set_focus(cbx_all)
 
     if cbx_all.get_toggle_state() == 1:
-        cbx_all.click_input()  # 👈 物理点击
+        cbx_all.click_input()
         time.sleep(0.5)
         print("✅ 已取消全选通道")
-    else:
-        print("✅ 通道已处于未全选状态")
 
     select_specific_channels(main_window, CONFIG['TARGET_CHANNELS'])
 
     btn_confirm = main_window.child_window(auto_id="btn_confirm", control_type="Button")
     btn_confirm.wait("enabled", timeout=UI_TIMIEOUT)
-    btn_confirm.click_input()  # 👈 物理点击
+    btn_confirm.click_input()
     time.sleep(3)
     print(f"✅ 已确认选中指定通道：{CONFIG['TARGET_CHANNELS']}")
 
@@ -325,7 +374,6 @@ def test_random_config_parameters():
         assert True, "✅ 随机参数配置完成"
     except Exception as e:
         pytest.fail(f"❌ 参数配置失败：{str(e)}")
-
 
 def test_navigation_buttons_operation():
     print("开始执行导航按钮操作...")
@@ -342,7 +390,6 @@ def test_navigation_buttons_operation():
     except Exception as e:
         pytest.fail(f"❌ 导航按钮操作失败：{str(e)}")
 
-
 def test_drag_progress_bar():
     print("开始拖拽进度条...")
     try:
@@ -355,7 +402,6 @@ def test_drag_progress_bar():
     except Exception as e:
         pytest.fail(f"❌ 进度条拖拽失败：{str(e)}")
 
-
 def test_random_add_tags():
     print("开始随机标记标签...")
     try:
@@ -364,6 +410,7 @@ def test_random_add_tags():
         success_count = 0
 
         for tag_idx in range(1, tag_count + 1):
+            check_stop_pause()
             target_tag = random.choice(list(CONFIG['TAG_LIST']))
             print(f"\n第{tag_idx}/{tag_count}个标签：尝试标记「{target_tag}」")
 
@@ -379,6 +426,7 @@ def test_random_add_tags():
             found = False
 
             for down_count in range(1, CONFIG['MAX_DOWN_RETRIES'] + 1):
+                check_stop_pause()
                 down_button.click_input()
                 time.sleep(0.4)
                 if find_and_click_tag(main_window, target_tag):
@@ -391,7 +439,6 @@ def test_random_add_tags():
             if not found:
                 print(f"翻页{CONFIG['MAX_DOWN_RETRIES']}次未找到「{target_tag}」，跳过")
 
-        # 断言：至少成功打一个标签
         assert success_count >= 1, f"❌ 标签标记失败，成功数：{success_count}"
         print(f"✅ 标签标记完成，成功总数：{success_count}/{tag_count}")
 
