@@ -145,18 +145,22 @@ class PytestRunnerPlugin:
             return
 
         idx = self.node_to_index.get(report.nodeid)
-        if idx is None or report.when != "call":
+        # if idx is None or report.when != "call":
+        if idx is None:
             return
 
-        if report.passed:
-            self.status_signal.emit(idx, "PASS")
-            self.log_signal.emit({"level": "success", "msg": f"用例[{idx+1}]通过"})
-        elif report.failed:
-            self.status_signal.emit(idx, "FAIL")
-            self.log_signal.emit({"level": "error", "msg": f"用例[{idx+1}]失败"})
-        elif report.skipped:
+        if report.skipped:
+            # 跳过：setup 阶段就会触发
             self.status_signal.emit(idx, "SKIP")
-            self.log_signal.emit({"level": "skip", "msg": f"用例[{idx+1}]跳过"})
+            self.log_signal.emit({"level": "skip", "msg": f"用例[{idx + 1}]跳过"})
+        elif report.when == "call":
+            # 成功/失败：只看 call 阶段
+            if report.passed:
+                self.status_signal.emit(idx, "PASS")
+                self.log_signal.emit({"level": "success", "msg": f"用例[{idx + 1}]通过"})
+            elif report.failed:
+                self.status_signal.emit(idx, "FAIL")
+                self.log_signal.emit({"level": "error", "msg": f"用例[{idx + 1}]失败"})
 
 
 # ---------------------------------------------------------------------------
