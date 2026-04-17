@@ -136,6 +136,9 @@ def check_stop_pause():
             if stop:
                 pytest.exit("测试已停止")
 
+execute_times = 1
+operate_interval = 1
+
 def refresh_params():
     global execute_times, operate_interval
     execute_times, operate_interval = OperateSharedData.read_params()
@@ -188,10 +191,12 @@ def run_recorder_app():
 @pytest.fixture(autouse=True)
 def global_interval():
     yield
+    refresh_params()
+    time.sleep(operate_interval)
     check_stop_pause()
-    time.sleep(3)
 
 # ========================= 测试用例 =========================
+# @pytest.mark.skip('skip test_recorder_connect_device')
 def test_recorder_connect_device():
     """扫描设备&连接设备"""
     max_retry = 3
@@ -248,7 +253,7 @@ def test_recorder_connect_device():
     print("✅ 设备连接成功！")
     assert True
 
-
+# @pytest.mark.skip('skip test_recorder_set_sampling_rate')
 def test_recorder_set_sampling_rate():
     """设置采样率"""
     try:
@@ -280,7 +285,7 @@ def test_recorder_set_sampling_rate():
     except Exception as e:
         pytest.fail(f"❌ 设置采样率失败: {str(e)}")
 
-
+# @pytest.mark.skip('skip test_recorder_set_lead_source')
 def test_recorder_set_lead_source():
     """配置导联源"""
     try:
@@ -349,7 +354,7 @@ def test_recorder_set_filter():
     except Exception as e:
         pytest.fail(f"❌ Filter 配置失败: {str(e)}")
 
-@pytest.mark.skip('skip test_recorder_check_impedance')
+# @pytest.mark.skip('skip test_recorder_check_impedance')
 def test_recorder_check_impedance():
     """阻抗检测"""
     print("\n===== 阻抗检测 =====")
@@ -357,7 +362,7 @@ def test_recorder_check_impedance():
     assert ret, "阻抗检测失败"
 
 
-
+# @pytest.mark.skip('skip:test_recorder_start_collection')
 def test_recorder_start_collection():
     """开始采集 + 填写信息"""
     print("\n===== 开始采集 =====")
@@ -431,7 +436,7 @@ def test_recorder_auto_marking():
     except Exception as e:
         pytest.fail(f"❌ 自动标记失败: {str(e)}")
 
-
+# @pytest.mark.skip('skip:test_recorder_stop_and_save')
 def test_recorder_stop_and_save():
     """结束采集 & 保存"""
     print("\n===== 结束采集并保存 =====")
@@ -477,3 +482,38 @@ def test_recorder_stop_and_save():
 
     except Exception as e:
         pytest.fail(f"❌ 保存失败: {str(e)}")
+
+def run_all_test_cases():
+    test_recorder_connect_device()
+    test_recorder_set_sampling_rate()
+    test_recorder_set_lead_source()
+
+    test_recorder_set_sweep_speed()
+    test_recorder_set_sensitivity()
+    test_recorder_set_filter()
+
+    test_recorder_check_impedance()
+    test_recorder_start_collection()
+    test_recorder_auto_marking()
+    test_recorder_stop_and_save()
+
+@pytest.mark.skip('skip test_recorder_main_auto_run')
+def test_recorder_main_auto_run():
+    """采集软件压力测试"""
+    global execute_times, operate_interval
+    refresh_params()
+    print(f"\n🚀 采集压力测试，轮次: {execute_times}")
+
+    for i in range(1, execute_times + 1):
+        check_stop_pause()
+        print(f"\n=====================================")
+        print(f"📌 第 {i} 轮采集测试开始")
+        print(f"=====================================\n")
+
+        run_all_test_cases()
+
+        print(f"✅ 第 {i} 轮完成")
+        refresh_params()
+        time.sleep(operate_interval)
+
+    print("\n🎉 采集软件所有轮次执行完毕！")
