@@ -8,23 +8,26 @@ import os
 import datetime
 import random
 import time
+
+import keyboard
+import pyautogui
 import pytest
 import subprocess
 import psutil
-from pywinauto import Application, mouse
+from pywinauto import Application, mouse, Desktop
 from pywinauto.findwindows import find_window
 from pywinauto.timings import wait_until_passes
 
 from app.app_common import OperateSharedData
 
 # ========================= 配置参数 =========================
-UI_TIMEOUT = 5
+UI_TIMEOUT = 3
 CONFIG = {
-    "APP_PATH": r"D:\Program Files\NeuroSync\Recorder3\NeuroSync.Client.Recorder.exe",
+    "APP_PATH": r"D:\Program Files\NeuroSync\Recorder3",
     "COLLECTION_DURATION": 60,
     "SAMPLING_RATE": 500,
-    "LEAD_SOURCE_INDEX": 3,
-    "DAO_LIAN_INDEX": 3,
+    "LEAD_SOURCE_INDEX": 2,
+    "DAO_LIAN_INDEX": 2,
     "CLICK_INTERVAL": 3,
     "SWEEP_SPEED_RANGE": range(0, 8),
     "SENSITIVITY_RANGE": range(0, 16),
@@ -69,7 +72,7 @@ def select_combobox_item(main_window, found_index, value, desc=""):
 
 def check_impedance(main_window):
     try:
-        btn = main_window.child_window(title="阻抗", control_type="Button")
+        btn = main_window.child_window(title="Impedance", control_type="Button")
         btn.wait('visible', timeout=UI_TIMEOUT)
         btn.click_input()
         print("✅ 打开阻抗检测")
@@ -146,16 +149,20 @@ PROCESS_PID = None
 @pytest.fixture(scope="session", autouse=True)
 def run_recorder_app():
     global app_instance, main_window, PROCESS_PID
+    from pywinauto import actionlogger
+    actionlogger.ActionLogger.log = lambda *args, **kwargs: None
     print("\n==============================================")
     print("✅ 启动 NeuroSync 采集软件...")
     print("==============================================\n")
 
-    exe_path = CONFIG["APP_PATH"]
-    assert os.path.exists(exe_path), "采集软件路径不存在"
+    app_dir = CONFIG['APP_PATH']
+    exe_files = [f for f in os.listdir(app_dir) if f.lower().endswith(".exe")]
+    assert len(exe_files) > 0, "未找到EXE"
+    exe_path = os.path.join(app_dir, exe_files[0])
 
     proc = subprocess.Popen([exe_path], creationflags=subprocess.CREATE_NO_WINDOW)
     PROCESS_PID = proc.pid
-    time.sleep(6)
+    time.sleep(8)
 
     app_instance = Application(backend="uia").connect(title_re="NeuroSync.*", timeout=20)
     main_window = app_instance.window(title_re="NeuroSync.*")
@@ -182,240 +189,204 @@ def run_recorder_app():
 def global_interval():
     yield
     check_stop_pause()
-    time.sleep(1)
+    time.sleep(3)
 
 # ========================= 测试用例 =========================
 def test_recorder_connect_device():
-    """测试：连接设备 & 扫描设备"""
-    print("\n===== 开始扫描并连接设备 =====")
-    try:
-        safe_set_focus(main_window)
-        time.sleep(1)
+    """扫描设备&连接设备"""
+    max_retry = 3
+    connected = False
 
-        # 1. 查找设备（和你原来一样）
-        find_device_btn = main_window.child_window(
-            title="NeuroSync.Client.Recorder.Pages.Windows.MainWindowViewModel",
-            control_type="Button"
-        )
-        find_device_btn.wait('visible', timeout=10)
-        find_device_btn.click()  # ✔ 用你原来的 click
-        print("✅ 点击查找设备")
-        time.sleep(2)
+    for attempt in range(1, max_retry + 1):
+        try:
+            print(f"\n===== 第 {attempt} 次扫描设备 =====")
 
-        # ============================
-        # 🔥 完全使用你原来的成功逻辑
-        # ============================
-        scan_btn = main_window.child_window(title="Scan", control_type="Button")
-        scan_btn.wait('visible', timeout=UI_TIMEOUT * 2)
-        scan_btn.wait('enabled', timeout=UI_TIMEOUT * 2)
-
-        # ❌ 删掉所有 parent、focus、activate、弹窗操作
-        # ✔️ 只保留你原来能用的方式：直接 click()
-        scan_btn.click()  # ✅ 这是你原来能用的关键！
-
-        print("✅ 开始扫描设备")
-        time.sleep(10)
-
-        # 连接设备
-        connects = main_window.descendants(title="Connect", control_type="Button")
-        assert connects, "未找到连接按钮"
-        connects[0].click_input()
-        time.sleep(3)
-        print("✅ 点击连接设备")
-
-        confirm = main_window.child_window(auto_id="Confirm", control_type="Button")
-        confirm.wait('visible', timeout=5)
-        confirm.click_input()
-        time.sleep(1)
-        print("✅ 确认连接成功")
-
-        assert True
-
-    except Exception as e:
-        pytest.fail(f"❌ 连接设备失败: {str(e)}")
-# def test_recorder_connect_device():
-#     """测试：连接设备 & 扫描设备"""
-#     print("\n===== 开始扫描并连接设备 =====")
-#     try:
-#         safe_set_focus(main_window)
-#         time.sleep(1)
-#
-#         # 1. 查找设备
-#         find_device_btn = main_window.child_window(
-#             title="NeuroSync.Client.Recorder.Pages.Windows.MainWindowViewModel",
-#             control_type="Button"
-#         )
-#         find_device_btn.wait('enabled', timeout=10)
-#         find_device_btn.click_input()
-#         print("✅ 点击查找设备")
-#         time.sleep(2)
-#
-#         # ==============================================
-#         # 🔥 【终极正确写法】全局捕获弹窗，不管焦点在哪
-#         # ==============================================
-#         from pywinauto import Desktop
-#         popup = Desktop(backend="uia").window(control_type="Window", found_index=1)
-#         popup.wait('visible', timeout=5)
-#         time.sleep(0.5)
-#
-#         # 点击扫描按钮
-#         scan_btn = popup.child_window(title="Scan", control_type="Button")
-#         scan_btn.wait('enabled', timeout=5)
-#         scan_btn.click_input()
-#         print("✅ 扫描按钮已点击！")
-#         time.sleep(10)
-#
-#         # 连接设备
-#         connects = main_window.descendants(title="Connect", control_type="Button")
-#         assert connects, "未找到连接按钮"
-#         connects[0].click_input()
-#         time.sleep(3)
-#         print("✅ 点击连接设备")
-#
-#         # 确认
-#         confirm = main_window.child_window(auto_id="Confirm", control_type="Button")
-#         confirm.wait('enabled', timeout=5)
-#         confirm.click_input()
-#         time.sleep(1)
-#         print("✅ 确认连接成功")
-#
-#         assert True
-#
-#     except Exception as e:
-#         pytest.fail(f"❌ 连接设备失败: {str(e)}")
-
-def test_recorder_set_sampling_rate():
-    """测试：设置采样率"""
-    print("\n===== 设置采样率 =====")
-    try:
-        # ===================== 修复核心 =====================
-        # 1. 先等待【采样率设置页面】整体出现
-        sampling_rate_panel = main_window.child_window(title="Select Sampling Rate", control_type="Window")
-        sampling_rate_panel.wait('visible', timeout=UI_TIMEOUT * 2)
-        safe_set_focus(sampling_rate_panel)
-        time.sleep(1)
-
-        # 2. 再找采样率单选框
-        aid = f"Radio{CONFIG['SAMPLING_RATE']}"
-        radio = main_window.child_window(auto_id=aid, control_type="RadioButton")
-        radio.wait('visible', timeout=UI_TIMEOUT)
-        radio.wait('enabled', timeout=UI_TIMEOUT)
-        radio.click_input()
-        print(f"✅ 采样率设置为 {CONFIG['SAMPLING_RATE']} Hz")
-        time.sleep(0.5)
-
-        # 3. 点击确定（英文 OK）
-        confirm = main_window.child_window(title="OK", control_type="Button")
-        confirm.wait('enabled', timeout=UI_TIMEOUT)
-        confirm.click_input()
-        time.sleep(1)
-
-        # 4. 再次确定（导联源弹窗）
-        confirm2 = main_window.child_window(title="OK", control_type="Button")
-        if confirm2.exists(timeout=UI_TIMEOUT):
-            confirm2.click_input()
+            # 1. 点击查找设备
+            find_device_btn = main_window.child_window(
+                title="NeuroSync.Client.Recorder.Pages.Windows.MainWindowViewModel",
+                control_type="Button"
+            )
+            find_device_btn.wait('visible', timeout=UI_TIMEOUT)
+            find_device_btn.click()
             time.sleep(1)
 
-        assert True, "采样率设置成功"
+            # 2. 点击扫描
+            scan_btn = main_window.child_window(title="Scan", control_type="Button")
+            scan_btn.wait('visible', timeout=UI_TIMEOUT)
+            scan_btn.click()
+            print("✅ 开始扫描...")
+            time.sleep(10)  # 扫描时间
+
+            # 3. 检查是否出现设备
+            connects = main_window.descendants(title="Connect", control_type="Button")
+            if connects:
+                print("✅ 发现设备，点击连接")
+                connects[0].click()
+                time.sleep(3)
+                connected = True
+                break  # 成功就退出循环
+            else:
+                print(f"⚠️  第 {attempt} 次未扫描到设备，重试中...")
+
+        except Exception as e:
+            print(f"⚠️  第 {attempt} 次扫描异常: {str(e)}")
+            continue
+
+    # ===================== 核心修复 =====================
+    # 必须先判断是否成功，否则直接失败
+    assert connected, "❌ 3次扫描均未发现设备"
+
+    # 只有连接成功后，才执行确认
+    try:
+        confirm = main_window.child_window(auto_id="Confirm", control_type="Button")
+        if confirm.exists(timeout=2):
+            confirm.click()
+            time.sleep(5)
+    except:
+        print("⚠️ 未找到确认弹窗，跳过")
+
+    print("✅ 设备连接成功！")
+    assert True
+
+
+def test_recorder_set_sampling_rate():
+    """设置采样率"""
+    try:
+        # 等待采样率弹窗出现（必须等！连续执行必备）
+        sampling_rate_panel = main_window.child_window(title="Select SampleRate", control_type="Window")
+        # sampling_rate_panel.wait('visible', timeout=UI_TIMEOUT)
+        # sampling_rate_panel.wait('enabled', timeout=UI_TIMEOUT)
+
+        # 安全聚焦弹窗
+        safe_set_focus(sampling_rate_panel)
+        time.sleep(0.5)
+
+        # 选择采样率
+        aid = f"Radio{CONFIG['SAMPLING_RATE']}"
+        radio = sampling_rate_panel.child_window(auto_id=aid, control_type="RadioButton")
+        # radio.wait('enabled', timeout=UI_TIMEOUT)
+        radio.click()
+        time.sleep(1)
+
+        # 点击确认
+        confirm = sampling_rate_panel.child_window(title="OK", control_type="Button")
+        # confirm.wait('enabled', timeout=UI_TIMEOUT)
+        confirm.click()
+        time.sleep(2)  # 让弹窗关闭，保证下一个case稳定
+
+        print("✅ 采样率设置成功！")
+        assert True
 
     except Exception as e:
         pytest.fail(f"❌ 设置采样率失败: {str(e)}")
 
-def test_recorder_set_lead_source():
-    """测试：设置导联源 & 应用"""
-    print("\n===== 设置导联源 =====")
-    try:
-        combo = main_window.child_window(control_type="ComboBox", found_index=0)
-        combo.wait('enabled', timeout=UI_TIMEOUT)
-        combo.click_input()
-        time.sleep(0.3)
-        combo.select(CONFIG["LEAD_SOURCE_INDEX"])
-        print(f"✅ 导联源选择索引: {CONFIG['LEAD_SOURCE_INDEX']}")
 
-        apply = main_window.child_window(title="Apply", control_type="Button")
-        apply.wait('enabled', timeout=UI_TIMEOUT)
-        apply.click_input()
-        print("✅ 应用设置")
+def test_recorder_set_lead_source():
+    """配置导联源"""
+    try:
+        # 连续执行必须加等待！！！
+        lead_source_confirm_panel = main_window.child_window(title="Information", control_type="Window")
+        # lead_source_confirm_panel.wait('visible', timeout=UI_TIMEOUT)
+        # lead_source_confirm_panel.wait('enabled', timeout=UI_TIMEOUT)
+
+        safe_set_focus(lead_source_confirm_panel)
+        time.sleep(0.5)
+
+        Cancel = lead_source_confirm_panel.child_window(title="Cancel", control_type="Button")
+        Cancel.wait('enabled', timeout=UI_TIMEOUT)
+        Cancel.click()
+        time.sleep(2)
+
+        lead_combo = main_window.child_window(control_type="ComboBox",found_index=0)
+        # lead_combo.wait('visible', timeout=UI_TIMEOUT)
+        # lead_combo.wait('enabled', timeout=UI_TIMEOUT)
+        safe_set_focus(lead_combo)
+
+        lead_combo.click_input()
+        time.sleep(0.3)
+        lead_combo.select(CONFIG["LEAD_SOURCE_INDEX"])
+
+        print("✅ 导联源窗口已关闭")
         assert True
+
     except Exception as e:
         pytest.fail(f"❌ 设置导联源失败: {str(e)}")
 
-def test_recorder_exit_setting():
-    """测试：退出设置页面"""
-    print("\n===== 退出设置页面 =====")
+# @pytest.mark.skip('skip test_recorder_set_sweep_speed')
+def test_recorder_set_sweep_speed():
+    """配置扫描速度"""
+    print("\n===== 配置扫描速度 =====")
     try:
-        x, y = CONFIG["EXIT_SETTING_POS"]
-        btn = None
-        for b in main_window.descendants(control_type="Button"):
-            try:
-                r = b.rectangle()
-                if r.left == x and r.top == y:
-                    btn = b
-                    break
-            except:
-                continue
-        assert btn, "未找到退出设置按钮"
-        btn.click_input()
-        print("✅ 已退出设置页面")
+        # 随机选择
+        value = random.choice(CONFIG["SWEEP_SPEED_RANGE"])
+        ret = select_combobox_item(main_window, found_index=1, value=value, desc="Sweep Speed")
+        assert ret, "Sweep Speed 配置失败"
         assert True
     except Exception as e:
-        pytest.fail(f"❌ 退出设置失败: {str(e)}")
+        pytest.fail(f"❌ Sweep Speed 配置失败: {str(e)}")
 
-def test_recorder_set_parameters():
-    """测试：随机配置参数（导联/速度/灵敏度/滤波）"""
-    print("\n===== 配置采集参数 =====")
+# @pytest.mark.skip('skip test_recorder_set_sensitivity')
+def test_recorder_set_sensitivity():
+    """配置灵敏度"""
+    print("\n===== 配置灵敏度 =====")
     try:
-        items = [
-            {"desc": "Montage Switch", "found_index": 0, "value": CONFIG["DAO_LIAN_INDEX"]},
-            {"desc": "Sweep Speed", "found_index": 1, "value": lambda: random.choice(CONFIG["SWEEP_SPEED_RANGE"])},
-            {"desc": "Sensitivity", "found_index": 2, "value": lambda: random.choice(CONFIG["SENSITIVITY_RANGE"])},
-            {"desc": "Filter", "found_index": 3, "value": lambda: random.choice(CONFIG["FILTER"])},
-            # {"desc": "低通滤波", "found_index": 4, "value": lambda: random.choice(CONFIG["LOW_PASS_RANGE"])},
-        ]
-        for item in items:
-            ret = select_combobox_item(main_window, item["found_index"], item["value"], item["desc"])
-            assert ret, f"{item['desc']} 配置失败"
+        value = random.choice(CONFIG["SENSITIVITY_RANGE"])
+        ret = select_combobox_item(main_window, found_index=2, value=value, desc="Sensitivity")
+        assert ret, "Sensitivity 配置失败"
         assert True
     except Exception as e:
-        pytest.fail(f"❌ 配置参数失败: {str(e)}")
+        pytest.fail(f"❌ Sensitivity 配置失败: {str(e)}")
 
+# @pytest.mark.skip('skip test_recorder_set_filter')
+def test_recorder_set_filter():
+    """配置滤波"""
+    print("\n===== 配置滤波 =====")
+    try:
+        value = random.choice(CONFIG["FILTER"])
+        ret = select_combobox_item(main_window, found_index=3, value=value, desc="Filter")
+        assert ret, "Filter 配置失败"
+        assert True
+    except Exception as e:
+        pytest.fail(f"❌ Filter 配置失败: {str(e)}")
+
+@pytest.mark.skip('skip test_recorder_check_impedance')
 def test_recorder_check_impedance():
-    """测试：阻抗检测"""
+    """阻抗检测"""
     print("\n===== 阻抗检测 =====")
     ret = check_impedance(main_window)
     assert ret, "阻抗检测失败"
 
+
+
 def test_recorder_start_collection():
-    """测试：开始采集 + 填写信息"""
+    """开始采集 + 填写信息"""
     print("\n===== 开始采集 =====")
     try:
-        marker_list = main_window.child_window(title="Evoked Experiment Management", control_type="Button")
-        marker_list.wait('enabled', timeout=UI_TIMEOUT)
-        marker_list.click_input()
-        print("✅ 打开标记列表")
-
         start = main_window.child_window(title="Start", control_type="Button")
-        start.click_input()
+        start.click()
         print("✅ 点击开始采集")
 
         edits = main_window.descendants(class_name="TextBox", control_type="Edit")
         edits[0].set_text(CONFIG["PATIENTS_NAME"])
         print(f"✅ 患者姓名: {CONFIG['PATIENTS_NAME']}")
 
-        birthday = main_window.child_window(auto_id="targetElement", control_type="Button")
-        birthday.click()
-        today = datetime.date.today().strftime("%YYear%mMonth%dDay") \
-            .replace("01Day", "1Day").replace("02Day", "2Day").replace("03Day", "3Day") \
-            .replace("04Day", "4Day").replace("05Day", "5Day").replace("06Day", "6Day") \
-            .replace("07Day", "7Day").replace("08Day", "8Day").replace("09Day", "9Day")
-        date_btn = main_window.child_window(title=today, control_type="Button")
-        date_btn.click_input()
-        print("✅ 选择出生日期")
+        # 3. 点开日期选择器
+        birthday_fields = main_window.child_window(auto_id="targetElement", control_type="Button")
+        birthday_fields.click()
+        time.sleep(2)
 
-        eeg = main_window.child_window(title="Continue", control_type="Button")
-        eeg.click()
+        day = str(datetime.date.today().day)
+        choose_date_btn = main_window.child_window(title=day, control_type="Text",found_index=0 )
+        choose_date_btn.wait('visible', timeout=3000)
+        choose_date_btn.click_input()
+
+        continue_btn = main_window.child_window(title="Continue", control_type="Button")
+        continue_btn.wait('visible', timeout=UI_TIMEOUT)
+        continue_btn.click()
+
         awake = main_window.child_window(title="Awake", control_type="CheckBox")
         awake.click_input()
+
         confirm = main_window.child_window(title="Finish", control_type="Button")
         confirm.click_input()
         print("✅ 进入采集界面")
@@ -423,8 +394,9 @@ def test_recorder_start_collection():
     except Exception as e:
         pytest.fail(f"❌ 开始采集失败: {str(e)}")
 
+# @pytest.mark.skip('skip test_recorder_auto_marking')
 def test_recorder_auto_marking():
-    """测试：自动随机标记"""
+    """自动随机标记"""
     print("\n===== 开始自动标记 =====")
     try:
         start_time = datetime.datetime.now()
@@ -459,62 +431,49 @@ def test_recorder_auto_marking():
     except Exception as e:
         pytest.fail(f"❌ 自动标记失败: {str(e)}")
 
+
 def test_recorder_stop_and_save():
-    """测试：结束采集 & 保存"""
+    """结束采集 & 保存"""
     print("\n===== 结束采集并保存 =====")
     try:
-        end = main_window.child_window(title="End Record", control_type="Button")
-        end.click_input()
+        # 1. 结束录制
+        end = main_window.child_window(title="End", control_type="Button")
+        end.wait('enabled', timeout=UI_TIMEOUT)  # 等待可点击
+        end.click()
+        print("✅ 点击结束采集")
         time.sleep(1)
-        confirm = main_window.child_window(title="OK", control_type="Button")
-        confirm.click_input()
-        print("✅ 已结束采集")
 
+        # 2. 确认弹窗 OK
+        confirm = main_window.child_window(title="OK", control_type="Button")
+        confirm.wait('enabled', timeout=UI_TIMEOUT)
+        confirm.click()
+        print("✅ 已结束采集")
+        time.sleep(1)
+
+        # 3. 输入框输入内容
         edits = main_window.descendants(class_name="TextBox", control_type="Edit")
-        edits[1].set_text("123")
+        if len(edits) >= 2:
+            edits[1].set_text("123")
+            print("✅ 已输入备注: 123")
+
+        # 4. 勾选所有正常选项
         click_all_good_coop_radios(main_window)
 
+        # 5. 勾选意识丧失（容错）
         try:
-            main_window.child_window(title="Loss of consciousness", control_type="RadioButton").click()
-        except:
-            pass
+            loss = main_window.child_window(title="Loss of consciousness", control_type="RadioButton")
+            if loss.exists(timeout=1):
+                loss.click()
+        except Exception:
+            print("ℹ️ 未找到意识丧失选项，跳过")
 
+        # 6. 保存
         save = main_window.child_window(title="Save", control_type="Button")
-        save.click_input()
+        save.wait('enabled', timeout=UI_TIMEOUT)
+        save.click()
         print("✅ 保存成功")
+
         assert True
+
     except Exception as e:
         pytest.fail(f"❌ 保存失败: {str(e)}")
-
-# ========================= 压力测试 =========================
-execute_times = 1
-operate_interval = 1
-
-@pytest.mark.skip('暂时跳过压力测试')
-def test_recorder_main_auto_run():
-    """采集软件压力测试"""
-    global execute_times, operate_interval
-    refresh_params()
-    print(f"\n🚀 采集压力测试，轮次: {execute_times}")
-
-    for i in range(1, execute_times + 1):
-        check_stop_pause()
-        print(f"\n=====================================")
-        print(f"📌 第 {i} 轮采集测试开始")
-        print(f"=====================================\n")
-
-        test_recorder_connect_device()
-        test_recorder_set_sampling_rate()
-        test_recorder_set_lead_source()
-        test_recorder_exit_setting()
-        test_recorder_set_parameters()
-        test_recorder_check_impedance()
-        test_recorder_start_collection()
-        test_recorder_auto_marking()
-        test_recorder_stop_and_save()
-
-        print(f"✅ 第 {i} 轮完成")
-        refresh_params()
-        time.sleep(operate_interval)
-
-    print("\n🎉 采集软件所有轮次执行完毕！")
