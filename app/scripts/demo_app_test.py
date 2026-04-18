@@ -11,7 +11,6 @@ from app.app_common import OperateSharedData
 
 # ====================== 全局配置 ======================
 APP_PACKAGE_NAME = "com.oymotion.synchrony"
-APP_START_WAIT_TIME = 4
 
 # ====================== 全局控制方法 ======================
 def check_test_stop_pause():
@@ -56,7 +55,6 @@ def device_driver():
     driver = u2.connect()
     refresh_test_params()
     driver.app_start(APP_PACKAGE_NAME, stop=True)
-    time.sleep(APP_START_WAIT_TIME)
 
     yield driver
 
@@ -79,7 +77,6 @@ def test_agree_privacy_policy(device_driver):
     """
     同意隐私协议弹窗
     """
-    check_test_stop_pause()
     print("\n▶️ 执行：同意隐私协议")
 
     try:
@@ -93,7 +90,6 @@ def test_start_device_scan(device_driver):
     """
     启动设备扫描功能
     """
-    check_test_stop_pause()
     print("\n▶️ 执行：启动设备扫描")
 
     try:
@@ -111,7 +107,6 @@ def test_connect_first_detected_device(device_driver):
     """
     连接扫描到的第一个设备
     """
-    check_test_stop_pause()
     print("\n▶️ 执行：连接第一个扫描到的设备")
 
     try:
