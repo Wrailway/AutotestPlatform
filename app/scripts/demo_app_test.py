@@ -35,7 +35,7 @@ def check_test_stop_pause():
 
 # 全局动态参数
 execute_total_times = 1
-case_interval_seconds = 1
+case_interval_seconds = 5
 
 def refresh_test_params():
     """
@@ -116,3 +116,84 @@ def test_connect_first_detected_device(device_driver):
             print("✅ 设备连接成功")
     except Exception as error:
         pytest.fail(f"❌ 设备连接失败: {str(error)}")
+
+
+def test_enter_waveform_page(device_driver):
+    """
+    查看波形
+    """
+    print("\n▶️ 执行：查看波形")
+
+    try:
+        # 按照【关于】成功的方式：用 content-desc
+        device_driver(description="查看波形").wait(timeout=10)
+        device_driver(description="查看波形").click()
+        print("✅ 进入波形页面成功")
+        time.sleep(1)
+        device_driver(description="开始").wait(timeout=10)
+        device_driver(description="开始").click()
+        time.sleep(2)
+        device_driver.press("back")
+        time.sleep(1)
+    except Exception as e:
+        pytest.fail(f"❌ 查看波形失败: {str(e)}")
+
+
+def test_enter_data_distribution(device_driver):
+    """
+    数据分发页面
+    """
+    print("\n▶️ 执行：数据分发")
+
+    try:
+        # 按成功经验：用 description
+        device_driver(description="数据分发 (LSL)").wait(timeout=10)
+        device_driver(description="数据分发 (LSL)").click()
+        print("✅ 进入数据分发页面成功")
+
+        time.sleep(2)
+        device_driver.press("back")
+        time.sleep(1)
+    except Exception as e:
+        pytest.fail(f"❌ 数据分发失败: {str(e)}")
+
+
+def test_check_product_info(device_driver):
+    """
+    查看用户信息
+    """
+    print("\n▶️ 执行：查看用户信息")
+
+    try:
+        # 按成功经验：用 description
+        device_driver(description="查看产品信息").wait(timeout=10)
+        device_driver(description="查看产品信息").click()
+        print("✅ 查看产品信息成功")
+
+        time.sleep(2)
+        device_driver.press("back")
+        time.sleep(1)
+    except Exception as e:
+        pytest.fail(f"❌ 查看用户信息失败: {str(e)}")
+
+
+def test_enter_about_page(device_driver):
+    """
+    进入关于页面
+    """
+    print("\n▶️ 执行：关于页面")
+
+    try:
+        about = device_driver(description="关于", clickable=True)
+        about.wait(timeout=10)
+        about.click()
+
+        print("✅ 进入关于页面成功")
+
+        time.sleep(2)
+        device_driver.press("back")
+        time.sleep(2)
+    except Exception as e:
+        pytest.fail(f"❌ 进入关于页面失败: {str(e)}")
+
+
