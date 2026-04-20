@@ -83,7 +83,6 @@ def case_control_hook():
 # ====================== 工具函数 ======================
 def click_text_by_ocr(driver, target_text):
     try:
-        # ✅ 惰性导入，解决 UI 收集用例失败问题
         from rapidocr_onnxruntime import RapidOCR
         _ocr = RapidOCR()
 
@@ -91,13 +90,24 @@ def click_text_by_ocr(driver, target_text):
         img.save("tmp_screenshot.png")
         results, _ = _ocr("tmp_screenshot.png")
 
-        for (box, text, score) in results:
+        for item in results:
+            box = item[0]
+            text = item[1]
+
+            # ✅ 正确取坐标：四个点 → 取最小/最大
+            x_coords = [p[0] for p in box]
+            y_coords = [p[1] for p in box]
+            x1 = min(x_coords)
+            y1 = min(y_coords)
+            x2 = max(x_coords)
+            y2 = max(y_coords)
+
             if target_text in text:
-                x1, y1, x2, y2 = box
-                x = int((x1 + x2) / 2)
-                y = int((y1 + y2) / 2)
-                driver.click(x, y)
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
+                driver.click(cx, cy)
                 return True
+
     except Exception as e:
         print(f"⚠️ OCR异常: {e}")
     return False
@@ -236,6 +246,8 @@ def test_enter_about_page(device_driver):
 
     page_text = get_page_text(device_driver)
     assert any(kw in page_text for kw in OCR_KEY_ABOUT_PAGE), "❌ 关于页面内容异常"
-
+    time.sleep(SLEEP_DEFAULT)
+    # assert click_text_by_ocr(device_driver, OCR_KEY_ABOUT_PAGE[0])
+    # time.sleep(SLEEP_DEFAULT)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
