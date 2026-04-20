@@ -22,7 +22,7 @@ WAIT_TIMEOUT_LONG = 15         # 扫描、连接设备
 SLEEP_DEFAULT = 2    # 所有休眠统一2秒
 SLEEP_COLLECT = 10   # 仅采集时长10秒
 
-# ====================== 所有中文文案提取为变量 ======================
+# ====================== 所有界面文案提取为变量 ======================
 DESC_VIEW_WAVEFORM = "查看波形"
 DESC_START = "开始"
 DESC_DATA_COLLECT_BDF = "数据采集(bdf)"
@@ -34,17 +34,15 @@ DESC_ALLOW_WHEN_USING = "仅在使用中允许"
 DESC_VIEW_PRODUCT_INFO = "查看产品信息"
 DESC_ABOUT = "关于"
 DESC_CONNECT = "连接"
+DESC_FIND_DEVICE = "查找设备"
+DESC_READY = "就绪"  # 设备连接成功：就绪
 
 TEXT_AGREE_PRIVACY = "确定"
 
 # ====================== 全局控制方法 ======================
 def check_test_stop_pause():
-    """
-    检查测试控制状态
-    支持停止测试、暂停测试
-    """
+    """检查测试控制状态"""
     is_stop, is_pause = OperateSharedData.read_control()
-
     if is_stop:
         print("\n🛑 检测到停止信号，测试终止")
         pytest.exit("测试已手动停止")
@@ -63,9 +61,7 @@ execute_total_times = 1
 case_interval_seconds = 2
 
 def refresh_test_params():
-    """
-    从共享数据模块刷新测试参数
-    """
+    """从共享数据模块刷新测试参数"""
     global execute_total_times, case_interval_seconds
     execute_total_times, case_interval_seconds = OperateSharedData.read_params()
     print(f"\n🔄 参数已刷新 | 执行次数: {execute_total_times} | 用例间隔: {case_interval_seconds}s")
@@ -73,10 +69,7 @@ def refresh_test_params():
 # ====================== Pytest 夹具 ======================
 @pytest.fixture(scope="session", autouse=True)
 def device_driver():
-    """
-    全局设备驱动管理
-    负责APP启动、驱动初始化、测试结束关闭APP
-    """
+    """全局设备驱动管理"""
     driver = u2.connect()
     refresh_test_params()
     driver.app_start(APP_PACKAGE_NAME, stop=True)
@@ -89,10 +82,7 @@ def device_driver():
 
 @pytest.fixture(autouse=True)
 def case_control_hook():
-    """
-    全局用例控制钩子
-    每个用例执行后自动刷新参数、等待间隔、检查暂停/停止
-    """
+    """全局用例控制钩子"""
     yield
     refresh_test_params()
     time.sleep(case_interval_seconds)
@@ -100,14 +90,14 @@ def case_control_hook():
 
 # ====================== 工具函数 ======================
 def swipe_to_bottom(driver, times=5):
-    """滑动到页面最底部（通用工具函数）"""
+    """滑动到页面最底部"""
     for _ in range(times):
         driver.swipe(0.5, 0.9, 0.5, 0.1, 0.2)
         time.sleep(SLEEP_DEFAULT)
     time.sleep(SLEEP_DEFAULT)
 
 def click_if_exists(driver, desc, timeout=WAIT_TIMEOUT_VERY_SHORT):
-    """如果元素存在就点击，不存在跳过（权限弹窗专用）"""
+    """如果元素存在就点击，不存在跳过"""
     try:
         if driver(description=desc).wait(timeout=timeout):
             driver(description=desc).click()
@@ -125,69 +115,123 @@ def test_agree_privacy_policy(device_driver):
     click_if_exists(device_driver, TEXT_AGREE_PRIVACY, timeout=WAIT_TIMEOUT_SHORT)
 
 def test_start_device_scan(device_driver):
-    """启动设备扫描功能"""
-    print("\n▶️ 执行：启动设备扫描")
-    try:
+    """扫描设备"""
+    print("\n▶️ 执行：设备扫描（支持重试）")
+
+    MAX_RETRY = 3
+    found_device = False
+
+    for i in range(MAX_RETRY):
+        print(f"\n🔍 第 {i+1}/{MAX_RETRY} 次扫描...")
+
+        # 点击扫描按钮
         scan_button = device_driver(className="android.widget.Button", clickable=True)
         scan_button.wait(timeout=WAIT_TIMEOUT_NORMAL)
         scan_button.click()
-        print("✅ 设备扫描已启动")
-    except Exception as error:
-        pytest.fail(f"❌ 启动扫描失败: {str(error)}")
+
+        # 确认进入扫描页面
+        device_driver(description=DESC_FIND_DEVICE).wait(timeout=WAIT_TIMEOUT_LONG)
+
+        # 判断是否搜到设备
+        if device_driver(description=DESC_CONNECT).wait(timeout=WAIT_TIMEOUT_LONG):
+            print("✅ 扫描成功：已发现设备！")
+            found_device = True
+            break
+
+        print("⚠️ 本次未搜到设备，准备重试...")
+        time.sleep(SLEEP_DEFAULT)
+
+    assert found_device, f"❌ 扫描失败：重试 {MAX_RETRY} 次仍未找到设备"
 
 def test_connect_first_detected_device(device_driver):
-    """连接扫描到的第一个设备"""
-    print("\n▶️ 执行：连接第一个扫描到的设备")
-    try:
-        connect_button = device_driver(description=DESC_CONNECT)
-        connect_button.wait(timeout=WAIT_TIMEOUT_LONG)
-        connect_button.click()
-        time.sleep(SLEEP_DEFAULT)
-        print("✅ 设备连接成功")
-    except Exception as error:
-        pytest.fail(f"❌ 设备连接失败: {str(error)}")
+    """连接设备"""
+    print("\n▶️ 执行：连接设备")
 
-def test_enter_waveform_page(device_driver):
-    """查看波形"""
-    print("\n▶️ 执行：查看波形")
+    # 点击连接
+    device_driver(description=DESC_CONNECT).click()
+    time.sleep(SLEEP_DEFAULT)
 
-    try:
-        device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=DESC_VIEW_WAVEFORM).click()
-        print("✅ 进入波形页面成功")
-        time.sleep(SLEEP_DEFAULT)
+    # 判断连接成功：出现就绪状态
+    is_connected = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_LONG)
+    assert is_connected, f"❌ 设备连接失败，未出现 {DESC_READY} 状态"
 
-        device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=DESC_START).click()
-        time.sleep(SLEEP_DEFAULT)
+    print("✅ 设备连接成功，已进入就绪状态！")
 
-        # 滑到底部
-        swipe_to_bottom(device_driver, times=5)
+def test_navigate_to_waveform(device_driver):
+    """进入波形界面"""
+    print("\n▶️ 执行：进入波形界面")
 
-        device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=DESC_DATA_COLLECT_BDF).click()
+    # 点击查看波形
+    device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_VIEW_WAVEFORM).click()
+    time.sleep(SLEEP_DEFAULT)
 
-        # 权限弹窗
-        click_if_exists(device_driver, DESC_ALWAYS_ALLOW, timeout=WAIT_TIMEOUT_VERY_SHORT)
+    # 断言：成功进入波形页面（验证开始按钮存在）
+    is_page_open = device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_page_open, "❌ 进入波形页面失败"
+    print("✅ 成功进入波形界面")
 
-        # 数据采集10秒
-        time.sleep(SLEEP_COLLECT)
 
-        device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=DESC_STOP_COLLECT_BDF).click()
-        time.sleep(SLEEP_DEFAULT)
+def test_start_data_collection(device_driver):
+    """开始采集数据"""
+    print("\n▶️ 执行：开始采集数据")
 
-        device_driver(description=DESC_CONFIRM).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=DESC_CONFIRM).click()
-        time.sleep(SLEEP_DEFAULT)
+    # 点击开始
+    device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_START).click()
+    time.sleep(SLEEP_DEFAULT)
 
-        device_driver.press("back")
-        time.sleep(SLEEP_DEFAULT)
+    # 滑动到底部
+    swipe_to_bottom(device_driver)
 
-        print("✅ 波形采集流程完成")
+    # 点击数据采集
+    device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_DATA_COLLECT_BDF).click()
+    time.sleep(SLEEP_DEFAULT)
 
-    except Exception as e:
-        pytest.fail(f"❌ 查看波形失败: {str(e)}")
+    # 处理权限弹窗
+    click_if_exists(device_driver, DESC_ALWAYS_ALLOW)
+
+    # ======================
+    # 关键断言：开始后 → 按钮变成【停止采集】= 采集成功
+    # ======================
+    collect_running = device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert collect_running, "❌ 采集开启失败：未出现停止采集按钮"
+
+    print("✅ 数据采集已开始（按钮已切换为停止采集）")
+
+
+def test_stop_data_collection(device_driver):
+    """停止采集数据"""
+    print("\n▶️ 执行：停止采集数据")
+
+    # 采集持续时间
+    time.sleep(SLEEP_COLLECT)
+
+    # 点击停止采集
+    device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_STOP_COLLECT_BDF).click()
+    time.sleep(SLEEP_DEFAULT)
+
+    # ======================
+    # 关键断言：停止后 → 出现【确定】弹窗 = 停止成功
+    # ======================
+    stop_success = device_driver(description=DESC_CONFIRM).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert stop_success, "❌ 停止采集失败：未弹出确认保存弹窗"
+
+    # 点击确认
+    device_driver(description=DESC_CONFIRM).click()
+    time.sleep(SLEEP_DEFAULT)
+
+    # 返回设备页面
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+
+    # 最终返回设备页面验证
+    is_back_success = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_back_success, "❌ 返回设备页面失败"
+
+    print("✅ 停止采集成功，已返回设备页面")
 
 def test_enter_data_distribution(device_driver):
     """数据分发页面"""
@@ -200,8 +244,8 @@ def test_enter_data_distribution(device_driver):
         time.sleep(SLEEP_DEFAULT)
 
         click_if_exists(device_driver, DESC_ALLOW_WHEN_USING, timeout=WAIT_TIMEOUT_VERY_SHORT)
-
         time.sleep(SLEEP_DEFAULT)
+
         device_driver.press("back")
         time.sleep(SLEEP_DEFAULT)
 
@@ -229,9 +273,8 @@ def test_enter_about_page(device_driver):
     print("\n▶️ 执行：关于页面")
 
     try:
-        about = device_driver(description=DESC_ABOUT, clickable=True)
-        about.wait(timeout=WAIT_TIMEOUT_NORMAL)
-        about.click()
+        device_driver(description=DESC_ABOUT).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_ABOUT).click()
         print("✅ 进入关于页面成功")
         time.sleep(SLEEP_DEFAULT)
 
