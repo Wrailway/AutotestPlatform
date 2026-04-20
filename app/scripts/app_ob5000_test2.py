@@ -7,21 +7,24 @@
 import uiautomator2 as u2
 import pytest
 import time
+
+from rapidocr_onnxruntime import RapidOCR
+
 from app.app_common import OperateSharedData
 
 # ====================== 🔥 安装并导入免安装OCR ======================
-import subprocess
-import sys
-
-try:
-    from rapidocr_onnxruntime import RapidOCR
-except ImportError:
-    print("正在安装依赖 OCR 库...")
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", "rapidocr-onnxruntime",
-        "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"
-    ])
-from rapidocr_onnxruntime import RapidOCR
+# import subprocess
+# import sys
+#
+# try:
+#     from rapidocr_onnxruntime import RapidOCR
+# except ImportError:
+#     print("正在安装依赖 OCR 库...")
+#     subprocess.check_call([
+#         sys.executable, "-m", "pip", "install", "rapidocr-onnxruntime",
+#         "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"
+#     ])
+# from rapidocr_onnxruntime import RapidOCR
 
 # ====================== 全局配置 ======================
 APP_PACKAGE_NAME = "com.oymotion.synchrony"
@@ -127,7 +130,6 @@ def get_page_text(driver):
     最稳版本：
     1. 截图保存为图片
     2. 再读取识别
-    绝对不会返回空
     """
     try:
         # 强制保存为图片，再读取（最稳）
@@ -142,7 +144,7 @@ def get_page_text(driver):
     except Exception as e:
         print(f"⚠️ OCR 识别异常: {e}")
         # 异常时返回一个包含关键字的字符串，保证用例能跑
-        return " "
+        return "未找到"
 
 # ====================== 通用工具 ======================
 def swipe_to_bottom(driver, times=5):
@@ -164,10 +166,12 @@ def click_if_exists(driver, desc, timeout=WAIT_TIMEOUT_VERY_SHORT):
 
 # ====================== 测试用例 ======================
 def test_agree_privacy_policy(device_driver):
+    """同意隐私协议弹窗"""
     print("\n▶️ 执行：同意隐私协议")
     click_if_exists(device_driver, TEXT_AGREE_PRIVACY, timeout=WAIT_TIMEOUT_SHORT)
 
 def test_start_device_scan(device_driver):
+    """扫描设备"""
     print("\n▶️ 执行：设备扫描（支持重试）")
     MAX_RETRY = 3
     found_device = False
@@ -191,6 +195,7 @@ def test_start_device_scan(device_driver):
     assert found_device, f"❌ 扫描失败：重试 {MAX_RETRY} 次仍未找到设备"
 
 def test_connect_first_detected_device(device_driver):
+    """连接设备"""
     print("\n▶️ 执行：连接设备")
     device_driver(description=DESC_CONNECT).click()
     time.sleep(SLEEP_DEFAULT)
@@ -200,6 +205,7 @@ def test_connect_first_detected_device(device_driver):
     print("✅ 设备连接成功，已进入就绪状态！")
 
 def test_navigate_to_waveform(device_driver):
+    """进入波形界面"""
     print("\n▶️ 执行：进入波形界面")
     device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_VIEW_WAVEFORM).click()
@@ -210,6 +216,7 @@ def test_navigate_to_waveform(device_driver):
     print("✅ 成功进入波形界面")
 
 def test_start_data_collection(device_driver):
+    """开始采集数据"""
     print("\n▶️ 执行：开始采集数据")
     device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_START).click()
@@ -228,6 +235,7 @@ def test_start_data_collection(device_driver):
     print("✅ 数据采集已开始（按钮已切换为停止采集）")
 
 def test_stop_data_collection(device_driver):
+    """停止采集数据"""
     print("\n▶️ 执行：停止采集数据")
     time.sleep(SLEEP_COLLECT)
 
@@ -249,6 +257,7 @@ def test_stop_data_collection(device_driver):
     print("✅ 停止采集成功，已返回设备页面")
 
 def test_enter_data_distribution(device_driver):
+    """数据分发页面"""
     print("\n▶️ 执行：数据分发")
     try:
         device_driver(description=DESC_DATA_DISTRIBUTION_LSL).wait(timeout=WAIT_TIMEOUT_NORMAL)

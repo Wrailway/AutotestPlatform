@@ -9,6 +9,7 @@ import sys
 import os
 import time
 from datetime import datetime
+from rapidocr_onnxruntime import RapidOCR
 
 import pytest
 from openpyxl.styles import Alignment, Border, Side
