@@ -35,7 +35,7 @@ def check_test_stop_pause():
 
 # 全局动态参数
 execute_total_times = 1
-case_interval_seconds = 5
+case_interval_seconds = 2
 
 def refresh_test_params():
     """
@@ -133,6 +133,33 @@ def test_enter_waveform_page(device_driver):
         device_driver(description="开始").wait(timeout=10)
         device_driver(description="开始").click()
         time.sleep(2)
+        # 屏幕划到最低下
+        for _ in range(3):
+            device_driver.swipe(0.5, 0.9, 0.5, 0.1, 0.2)
+            time.sleep(0.3)
+        time.sleep(1)
+
+        device_driver(description="数据采集(bdf)").wait(timeout=10)
+        device_driver(description="数据采集(bdf)").click()
+
+        # ======================
+        # 权限弹窗：有就点，没有就跳过（关键！）
+        # ======================
+        try:
+            # 只等 2 秒，找不到就快速跳过
+            device_driver(description="始终允许").wait(timeout=2)
+            device_driver(description="始终允许").click()
+            print("✅ 检测到权限弹窗，已点击始终允许")
+        except Exception:
+            # 没有弹窗，直接跳过
+            print("ℹ️ 未检测到权限弹窗，跳过点击")
+
+        device_driver(description="停止采集(bdf)").wait(timeout=10)
+        device_driver(description="停止采集(bdf)").click()
+        time.sleep(1)
+        device_driver(description="确定").wait(timeout=10)
+        device_driver(description="确定").click()
+        time.sleep(2)
         device_driver.press("back")
         time.sleep(1)
     except Exception as e:
@@ -150,8 +177,18 @@ def test_enter_data_distribution(device_driver):
         device_driver(description="数据分发 (LSL)").wait(timeout=10)
         device_driver(description="数据分发 (LSL)").click()
         print("✅ 进入数据分发页面成功")
-
         time.sleep(2)
+        # ======================
+        # 权限弹窗：有就点，没有就跳过（关键！）
+        # ======================
+        try:
+            # 只等 2 秒，找不到就快速跳过
+            device_driver(description="仅在使用中允许").wait(timeout=2)
+            device_driver(description="仅在使用中允许").click()
+            print("✅ 检测到权限弹窗，已点击始终允许")
+        except Exception:
+            # 没有弹窗，直接跳过
+            print("ℹ️ 未检测到权限弹窗，跳过点击")
         device_driver.press("back")
         time.sleep(1)
     except Exception as e:
