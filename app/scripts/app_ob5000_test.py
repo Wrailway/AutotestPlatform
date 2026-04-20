@@ -12,6 +12,31 @@ from app.app_common import OperateSharedData
 # ====================== 全局配置 ======================
 APP_PACKAGE_NAME = "com.oymotion.synchrony"
 
+# ====================== 统一超时时间配置 ======================
+WAIT_TIMEOUT_VERY_SHORT = 2    # 弹窗、可选元素
+WAIT_TIMEOUT_SHORT = 5         # 常规弹窗
+WAIT_TIMEOUT_NORMAL = 10       # 标准页面加载
+WAIT_TIMEOUT_LONG = 15         # 扫描、连接设备
+
+# ====================== 统一休眠时间配置 ======================
+SLEEP_DEFAULT = 2    # 所有休眠统一2秒
+SLEEP_COLLECT = 10   # 仅采集时长10秒
+
+# ====================== 所有中文文案提取为变量 ======================
+DESC_VIEW_WAVEFORM = "查看波形"
+DESC_START = "开始"
+DESC_DATA_COLLECT_BDF = "数据采集(bdf)"
+DESC_STOP_COLLECT_BDF = "停止采集(bdf)"
+DESC_ALWAYS_ALLOW = "始终允许"
+DESC_CONFIRM = "确定"
+DESC_DATA_DISTRIBUTION_LSL = "数据分发 (LSL)"
+DESC_ALLOW_WHEN_USING = "仅在使用中允许"
+DESC_VIEW_PRODUCT_INFO = "查看产品信息"
+DESC_ABOUT = "关于"
+DESC_CONNECT = "连接"
+
+TEXT_AGREE_PRIVACY = "确定"
+
 # ====================== 全局控制方法 ======================
 def check_test_stop_pause():
     """
@@ -55,6 +80,7 @@ def device_driver():
     driver = u2.connect()
     refresh_test_params()
     driver.app_start(APP_PACKAGE_NAME, stop=True)
+    time.sleep(SLEEP_DEFAULT)
 
     yield driver
 
@@ -72,165 +98,145 @@ def case_control_hook():
     time.sleep(case_interval_seconds)
     check_test_stop_pause()
 
+# ====================== 工具函数 ======================
+def swipe_to_bottom(driver, times=5):
+    """滑动到页面最底部（通用工具函数）"""
+    for _ in range(times):
+        driver.swipe(0.5, 0.9, 0.5, 0.1, 0.2)
+        time.sleep(SLEEP_DEFAULT)
+    time.sleep(SLEEP_DEFAULT)
+
+def click_if_exists(driver, desc, timeout=WAIT_TIMEOUT_VERY_SHORT):
+    """如果元素存在就点击，不存在跳过（权限弹窗专用）"""
+    try:
+        if driver(description=desc).wait(timeout=timeout):
+            driver(description=desc).click()
+            print(f"✅ 已点击: {desc}")
+            return True
+    except:
+        pass
+    print(f"ℹ️ 未找到: {desc}，跳过")
+    return False
+
 # ====================== 测试用例 ======================
 def test_agree_privacy_policy(device_driver):
-    """
-    同意隐私协议弹窗
-    """
+    """同意隐私协议弹窗"""
     print("\n▶️ 执行：同意隐私协议")
-
-    try:
-        if device_driver(description="确定").wait(timeout=5):
-            device_driver(description="确定").click()
-            print("✅ 隐私协议已确认")
-    except Exception:
-        print("ℹ️ 未检测到隐私协议弹窗，跳过")
+    click_if_exists(device_driver, TEXT_AGREE_PRIVACY, timeout=WAIT_TIMEOUT_SHORT)
 
 def test_start_device_scan(device_driver):
-    """
-    启动设备扫描功能
-    """
+    """启动设备扫描功能"""
     print("\n▶️ 执行：启动设备扫描")
-
     try:
-        scan_button = device_driver(
-            className="android.widget.Button",
-            clickable=True
-        )
-        if scan_button.wait(timeout=10):
-            scan_button.click()
-            print("✅ 设备扫描已启动")
+        scan_button = device_driver(className="android.widget.Button", clickable=True)
+        scan_button.wait(timeout=WAIT_TIMEOUT_NORMAL)
+        scan_button.click()
+        print("✅ 设备扫描已启动")
     except Exception as error:
         pytest.fail(f"❌ 启动扫描失败: {str(error)}")
 
 def test_connect_first_detected_device(device_driver):
-    """
-    连接扫描到的第一个设备
-    """
+    """连接扫描到的第一个设备"""
     print("\n▶️ 执行：连接第一个扫描到的设备")
-
     try:
-        connect_button = device_driver(description="连接")
-        if connect_button.wait(timeout=10):
-            connect_button.click()
-            print("✅ 设备连接成功")
+        connect_button = device_driver(description=DESC_CONNECT)
+        connect_button.wait(timeout=WAIT_TIMEOUT_LONG)
+        connect_button.click()
+        time.sleep(SLEEP_DEFAULT)
+        print("✅ 设备连接成功")
     except Exception as error:
         pytest.fail(f"❌ 设备连接失败: {str(error)}")
 
-
 def test_enter_waveform_page(device_driver):
-    """
-    查看波形
-    """
+    """查看波形"""
     print("\n▶️ 执行：查看波形")
 
     try:
-        # 按照【关于】成功的方式：用 content-desc
-        device_driver(description="查看波形").wait(timeout=10)
-        device_driver(description="查看波形").click()
+        device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_VIEW_WAVEFORM).click()
         print("✅ 进入波形页面成功")
-        time.sleep(1)
-        device_driver(description="开始").wait(timeout=10)
-        device_driver(description="开始").click()
-        time.sleep(2)
-        # 屏幕划到最低下
-        for _ in range(3):
-            device_driver.swipe(0.5, 0.9, 0.5, 0.1, 0.2)
-            time.sleep(0.3)
-        time.sleep(1)
+        time.sleep(SLEEP_DEFAULT)
 
-        device_driver(description="数据采集(bdf)").wait(timeout=10)
-        device_driver(description="数据采集(bdf)").click()
+        device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_START).click()
+        time.sleep(SLEEP_DEFAULT)
 
-        # ======================
-        # 权限弹窗：有就点，没有就跳过（关键！）
-        # ======================
-        try:
-            # 只等 2 秒，找不到就快速跳过
-            device_driver(description="始终允许").wait(timeout=2)
-            device_driver(description="始终允许").click()
-            print("✅ 检测到权限弹窗，已点击始终允许")
-        except Exception:
-            # 没有弹窗，直接跳过
-            print("ℹ️ 未检测到权限弹窗，跳过点击")
+        # 滑到底部
+        swipe_to_bottom(device_driver, times=5)
 
-        device_driver(description="停止采集(bdf)").wait(timeout=10)
-        device_driver(description="停止采集(bdf)").click()
-        time.sleep(1)
-        device_driver(description="确定").wait(timeout=10)
-        device_driver(description="确定").click()
-        time.sleep(2)
+        device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_DATA_COLLECT_BDF).click()
+
+        # 权限弹窗
+        click_if_exists(device_driver, DESC_ALWAYS_ALLOW, timeout=WAIT_TIMEOUT_VERY_SHORT)
+
+        # 数据采集10秒
+        time.sleep(SLEEP_COLLECT)
+
+        device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_STOP_COLLECT_BDF).click()
+        time.sleep(SLEEP_DEFAULT)
+
+        device_driver(description=DESC_CONFIRM).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_CONFIRM).click()
+        time.sleep(SLEEP_DEFAULT)
+
         device_driver.press("back")
-        time.sleep(1)
+        time.sleep(SLEEP_DEFAULT)
+
+        print("✅ 波形采集流程完成")
+
     except Exception as e:
         pytest.fail(f"❌ 查看波形失败: {str(e)}")
 
-
 def test_enter_data_distribution(device_driver):
-    """
-    数据分发页面
-    """
+    """数据分发页面"""
     print("\n▶️ 执行：数据分发")
 
     try:
-        # 按成功经验：用 description
-        device_driver(description="数据分发 (LSL)").wait(timeout=10)
-        device_driver(description="数据分发 (LSL)").click()
+        device_driver(description=DESC_DATA_DISTRIBUTION_LSL).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_DATA_DISTRIBUTION_LSL).click()
         print("✅ 进入数据分发页面成功")
-        time.sleep(2)
-        # ======================
-        # 权限弹窗：有就点，没有就跳过（关键！）
-        # ======================
-        try:
-            # 只等 2 秒，找不到就快速跳过
-            device_driver(description="仅在使用中允许").wait(timeout=2)
-            device_driver(description="仅在使用中允许").click()
-            print("✅ 检测到权限弹窗，已点击始终允许")
-        except Exception:
-            # 没有弹窗，直接跳过
-            print("ℹ️ 未检测到权限弹窗，跳过点击")
+        time.sleep(SLEEP_DEFAULT)
+
+        click_if_exists(device_driver, DESC_ALLOW_WHEN_USING, timeout=WAIT_TIMEOUT_VERY_SHORT)
+
+        time.sleep(SLEEP_DEFAULT)
         device_driver.press("back")
-        time.sleep(1)
+        time.sleep(SLEEP_DEFAULT)
+
     except Exception as e:
         pytest.fail(f"❌ 数据分发失败: {str(e)}")
 
-
 def test_check_product_info(device_driver):
-    """
-    查看用户信息
-    """
-    print("\n▶️ 执行：查看用户信息")
+    """查看产品信息"""
+    print("\n▶️ 执行：查看产品信息")
 
     try:
-        # 按成功经验：用 description
-        device_driver(description="查看产品信息").wait(timeout=10)
-        device_driver(description="查看产品信息").click()
+        device_driver(description=DESC_VIEW_PRODUCT_INFO).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=DESC_VIEW_PRODUCT_INFO).click()
         print("✅ 查看产品信息成功")
+        time.sleep(SLEEP_DEFAULT)
 
-        time.sleep(2)
         device_driver.press("back")
-        time.sleep(1)
-    except Exception as e:
-        pytest.fail(f"❌ 查看用户信息失败: {str(e)}")
+        time.sleep(SLEEP_DEFAULT)
 
+    except Exception as e:
+        pytest.fail(f"❌ 查看产品信息失败: {str(e)}")
 
 def test_enter_about_page(device_driver):
-    """
-    进入关于页面
-    """
+    """进入关于页面"""
     print("\n▶️ 执行：关于页面")
 
     try:
-        about = device_driver(description="关于", clickable=True)
-        about.wait(timeout=10)
+        about = device_driver(description=DESC_ABOUT, clickable=True)
+        about.wait(timeout=WAIT_TIMEOUT_NORMAL)
         about.click()
-
         print("✅ 进入关于页面成功")
+        time.sleep(SLEEP_DEFAULT)
 
-        time.sleep(2)
         device_driver.press("back")
-        time.sleep(2)
+        time.sleep(SLEEP_DEFAULT)
+
     except Exception as e:
         pytest.fail(f"❌ 进入关于页面失败: {str(e)}")
-
-
