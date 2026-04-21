@@ -11,7 +11,7 @@ import time
 from app.app_common import OperateSharedData
 
 # ====================== 全局配置 ======================
-APP_PACKAGE_NAME = "com.oymotion.synchrony"
+APP_PACKAGE_NAME = "com.oymotion.synchronypro"
 
 # ====================== 超时时间 ======================
 WAIT_TIMEOUT_VERY_SHORT = 2
