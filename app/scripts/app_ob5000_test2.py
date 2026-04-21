@@ -43,6 +43,13 @@ TEXT_AGREE_PRIVACY = "确定"
 OCR_KEY_PRODUCT_INFO = ["设备地址"]
 OCR_KEY_ABOUT_PAGE = ["软件名称"]
 
+# ====================== 全局配置 ======================
+# 开关点击偏移量（根据你的设备分辨率修改）
+# 1200*2000 Pad → 450
+# 其他设备 → 自己测试后改这里
+SWITCH_OFFSET_X = 450
+# ======================================================
+
 # ====================== 全局控制 ======================
 def check_test_stop_pause():
     is_stop, is_pause = OperateSharedData.read_control()
@@ -81,7 +88,12 @@ def case_control_hook():
     check_test_stop_pause()
 
 # ====================== 工具函数 ======================
-def click_text_by_ocr(driver, target_text):
+def click_text_by_ocr(driver, target_text, offset_x=0, offset_y=0):
+    """
+    增强版：支持偏移点击，专门点复选框/开关
+    :param offset_x: 水平偏移（正数向右，负数向左）
+    :param offset_y: 垂直偏移（正数向下，负数向上）
+    """
     try:
         from rapidocr_onnxruntime import RapidOCR
         _ocr = RapidOCR()
@@ -94,9 +106,9 @@ def click_text_by_ocr(driver, target_text):
             box = item[0]
             text = item[1]
 
-            # ✅ 正确取坐标：四个点 → 取最小/最大
             x_coords = [p[0] for p in box]
             y_coords = [p[1] for p in box]
+
             x1 = min(x_coords)
             y1 = min(y_coords)
             x2 = max(x_coords)
@@ -105,7 +117,11 @@ def click_text_by_ocr(driver, target_text):
             if target_text in text:
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
-                driver.click(cx, cy)
+
+                final_x = cx + offset_x
+                final_y = cy + offset_y
+
+                driver.click(final_x, final_y)
                 return True
 
     except Exception as e:
@@ -178,11 +194,41 @@ def test_navigate_to_waveform(device_driver):
     is_page_open = device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     assert is_page_open, "❌ 进入波形页面失败"
 
-def test_start_data_collection(device_driver):
-    """开始数据采集"""
+def test_filter_choose(device_driver):
+    """测试滤波开关"""
     device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_START).click()
     time.sleep(SLEEP_DEFAULT)
+
+    # 50Hz滤除：打开 → 关闭
+    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+
+    # 60Hz滤除：打开 → 关闭
+    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+
+    # HPF：打开 → 关闭
+    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+
+    # LPF：打开 → 关闭
+    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    time.sleep(SLEEP_DEFAULT)
+
+def test_start_data_collection(device_driver):
+    """开始数据采集"""
+    # device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    # device_driver(description=DESC_START).click()
+    # time.sleep(SLEEP_DEFAULT)
 
     swipe_to_bottom(device_driver)
 
