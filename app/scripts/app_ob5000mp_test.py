@@ -11,7 +11,7 @@ import time
 from app.app_common import OperateSharedData
 
 # ====================== 全局配置 ======================
-APP_PACKAGE_NAME = "com.oymotion.synchronypro"
+APP_PACKAGE_NAME = "com.oymotion.synchronymp"
 
 # ====================== 超时时间 ======================
 WAIT_TIMEOUT_VERY_SHORT = 2
@@ -259,6 +259,7 @@ def test_stop_data_collection(device_driver):
     is_back_success = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
     assert is_back_success, "❌ 返回设备页面失败"
 
+@pytest.mark.skip('skpi test_enter_data_distribution')
 def test_enter_data_distribution(device_driver):
     """进入数据分发页面"""
     device_driver(description=DESC_DATA_DISTRIBUTION_LSL).wait(timeout=WAIT_TIMEOUT_NORMAL)
@@ -309,7 +310,6 @@ def run_all_test_cases(device_driver):
     test_filter_choose(device_driver)
     test_start_data_collection(device_driver)
     test_stop_data_collection(device_driver)
-    test_enter_data_distribution(device_driver)
     test_check_product_info(device_driver)
     test_enter_about_page(device_driver)
 

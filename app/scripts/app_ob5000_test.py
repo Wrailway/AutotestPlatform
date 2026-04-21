@@ -297,3 +297,54 @@ def test_enter_about_page(device_driver):
     # time.sleep(SLEEP_DEFAULT)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+
+# ========================= 统一用例入口 =========================
+def run_all_test_cases(device_driver):
+    """一轮完整测试流程（所有业务用例）"""
+    test_agree_privacy_policy(device_driver)
+    test_start_device_scan(device_driver)
+    test_connect_first_detected_device(device_driver)
+    test_navigate_to_waveform(device_driver)
+    test_filter_choose(device_driver)
+    test_start_data_collection(device_driver)
+    test_stop_data_collection(device_driver)
+    test_enter_data_distribution(device_driver)
+    test_check_product_info(device_driver)
+    test_enter_about_page(device_driver)
+
+
+# ========================= 主测试函数 =========================
+@pytest.mark.skip(' skip test_main_auto_run')
+def test_main_auto_run():
+    """压力测试（每次循环重启APP）"""
+    import uiautomator2 as u2
+    refresh_test_params()
+    print(f"\n🚀 开始执行压力测试，总轮次：{execute_total_times}")
+
+    for i in range(1, execute_total_times + 1):
+        check_test_stop_pause()
+        print(f"\n=====================================")
+        print(f"📌 第 {i}/{execute_total_times} 轮测试开始")
+        print(f"=====================================\n")
+
+        # ==============================================
+        # ✅ 每次循环都：重启 APP
+        # ==============================================
+        driver = u2.connect()
+        driver.app_stop(APP_PACKAGE_NAME)
+        time.sleep(1)
+        driver.app_start(APP_PACKAGE_NAME, stop=True)
+        time.sleep(SLEEP_DEFAULT)
+
+        # 执行一轮全量用例
+        run_all_test_cases(driver)
+
+        # 关闭 APP，准备下一轮重启
+        driver.app_stop(APP_PACKAGE_NAME)
+        time.sleep(2)
+
+        print(f"\n✅ 第 {i} 轮执行完成")
+        refresh_test_params()
+        time.sleep(case_interval_seconds)
+
+    print("\n🎉 所有压力测试轮次全部执行完毕！")
