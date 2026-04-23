@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-设备连接自动化测试
+设备连接自动化测试（优化稳定版）
 流程：启动APP → 同意隐私协议 → 扫描设备 → 连接设备 → 关闭APP
 全局控制：支持暂停、停止、动态参数刷新
 """
@@ -23,7 +23,7 @@ WAIT_TIMEOUT_LONG = 15
 SLEEP_DEFAULT = 2
 SLEEP_COLLECT = 10
 
-# ====================== 页面文字 ======================
+# ====================== 页面元素描述 ======================
 DESC_VIEW_WAVEFORM = "查看波形"
 DESC_START = "开始"
 DESC_DATA_COLLECT_BDF = "数据采集(bdf)"
@@ -39,16 +39,18 @@ DESC_FIND_DEVICE = "查找设备"
 DESC_READY = "就绪"
 TEXT_AGREE_PRIVACY = "确定"
 
-# ====================== OCR 校验关键字 ======================
-OCR_KEY_PRODUCT_INFO = ["设备地址"]
-OCR_KEY_ABOUT_PAGE = ["软件名称"]
+# ====================== 校验关键字 ======================
+DEVICE_ADDRESS = "设备地址"
+SOFTWARE_NAME = "软件名称"
 
-# ====================== 全局配置 ======================
-# 开关点击偏移量（根据你的设备分辨率修改）
-# 1200*2000 Pad → 450
-# 其他设备 → 自己测试后改这里
+# ====================== 滤波开关定义 ======================
+DESC_50HZ_FILTER = "50Hz滤除："
+DESC_60HZ_FILTER = "60Hz滤除："
+DESC_HPF_FILTER = "HPF："
+DESC_LPF_FILTER = "LPF ："
+
+# ====================== 开关点击偏移配置 ======================
 SWITCH_OFFSET_X = 450
-# ======================================================
 
 # ====================== 全局控制 ======================
 def check_test_stop_pause():
@@ -89,15 +91,9 @@ def case_control_hook():
 
 # ====================== 工具函数 ======================
 def click_text_by_ocr(driver, target_text, offset_x=0, offset_y=0):
-    """
-    增强版：支持偏移点击，专门点复选框/开关
-    :param offset_x: 水平偏移（正数向右，负数向左）
-    :param offset_y: 垂直偏移（正数向下，负数向上）
-    """
     try:
         from rapidocr_onnxruntime import RapidOCR
         _ocr = RapidOCR()
-
         img = driver.screenshot()
         img.save("tmp_screenshot.png")
         results, _ = _ocr("tmp_screenshot.png")
@@ -105,25 +101,16 @@ def click_text_by_ocr(driver, target_text, offset_x=0, offset_y=0):
         for item in results:
             box = item[0]
             text = item[1]
-
-            x_coords = [p[0] for p in box]
-            y_coords = [p[1] for p in box]
-
-            x1 = min(x_coords)
-            y1 = min(y_coords)
-            x2 = max(x_coords)
-            y2 = max(y_coords)
+            x1 = min(p[0] for p in box)
+            y1 = min(p[1] for p in box)
+            x2 = max(p[0] for p in box)
+            y2 = max(p[1] for p in box)
 
             if target_text in text:
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
-
-                final_x = cx + offset_x
-                final_y = cy + offset_y
-
-                driver.click(final_x, final_y)
+                driver.click(cx + offset_x, cy + offset_y)
                 return True
-
     except Exception as e:
         print(f"⚠️ OCR异常: {e}")
     return False
@@ -132,7 +119,6 @@ def get_page_text(driver):
     try:
         from rapidocr_onnxruntime import RapidOCR
         _ocr = RapidOCR()
-
         img = driver.screenshot()
         img.save("tmp_screenshot.png")
         results, _ = _ocr("tmp_screenshot.png")
@@ -164,82 +150,99 @@ def test_start_device_scan(device_driver):
     """扫描设备"""
     MAX_RETRY = 3
     found_device = False
-
     for i in range(MAX_RETRY):
         scan_button = device_driver(className="android.widget.Button", clickable=True)
         scan_button.wait(timeout=WAIT_TIMEOUT_NORMAL)
         scan_button.click()
 
         device_driver(description=DESC_FIND_DEVICE).wait(timeout=WAIT_TIMEOUT_LONG)
-
         if device_driver(description=DESC_CONNECT).wait(timeout=WAIT_TIMEOUT_LONG):
             found_device = True
             break
         time.sleep(SLEEP_DEFAULT)
-
     assert found_device, "❌ 扫描失败：未找到设备"
 
 def test_connect_first_detected_device(device_driver):
     """连接设备"""
     device_driver(description=DESC_CONNECT).click()
     time.sleep(SLEEP_DEFAULT)
-    is_connected = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_LONG)
-    assert is_connected, "❌ 设备连接失败"
+    assert device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_LONG), "❌ 设备连接失败"
 
 def test_navigate_to_waveform(device_driver):
     """进入波形界面"""
     device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_VIEW_WAVEFORM).click()
     time.sleep(SLEEP_DEFAULT)
-    is_page_open = device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    assert is_page_open, "❌ 进入波形页面失败"
+    assert device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 进入波形页面失败"
 
 def test_filter_choose(device_driver):
-    """测试滤波开关"""
+    """测试滤波开关操作"""
     device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_START).click()
     time.sleep(SLEEP_DEFAULT)
 
-    # 50Hz滤除：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    # ========== 50Hz ==========
+    assert device_driver(description=DESC_50HZ_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到50Hz滤除文本"
+    filter_50hz = device_driver.xpath('//android.widget.Switch[@index="2"]')
+    assert filter_50hz.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到50Hz开关"
 
-    # 60Hz滤除：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+    filter_50hz.click()
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    assert filter_50hz.get().attrib["checked"] == "false", "❌ 50Hz关闭失败"
 
-    # HPF：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+    filter_50hz.click()
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    assert filter_50hz.get().attrib["checked"] == "true", "❌ 50Hz恢复失败"
 
-    # LPF：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    # ========== 60Hz ==========
+    assert device_driver(description=DESC_60HZ_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到60Hz滤除文本"
+    filter_60hz = device_driver.xpath('//android.widget.Switch[@index="4"]')
+    assert filter_60hz.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到60Hz开关"
+
+    filter_60hz.click()
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    assert filter_60hz.get().attrib["checked"] == "false", "❌ 60Hz关闭失败"
+
+    filter_60hz.click()
     time.sleep(SLEEP_DEFAULT)
+    assert filter_60hz.get().attrib["checked"] == "true", "❌ 60Hz恢复失败"
+
+    # ========== HPF ==========
+    assert device_driver(description=DESC_HPF_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到HPF文本"
+    hpf = device_driver.xpath('//android.widget.Switch[@index="6"]')
+    assert hpf.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到HPF开关"
+
+    hpf.click()
+    time.sleep(SLEEP_DEFAULT)
+    assert hpf.get().attrib["checked"] == "false", "❌ HPF关闭失败"
+
+    hpf.click()
+    time.sleep(SLEEP_DEFAULT)
+    assert hpf.get().attrib["checked"] == "true", "❌ HPF恢复失败"
+
+    # ========== LPF ==========
+    assert device_driver(description=DESC_LPF_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到LPF文本"
+    lpf = device_driver.xpath('//android.widget.Switch[@index="8"]')
+    assert lpf.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到LPF开关"
+
+    lpf.click()
+    time.sleep(SLEEP_DEFAULT)
+    assert lpf.get().attrib["checked"] == "false", "❌ LPF关闭失败"
+
+    lpf.click()
+    time.sleep(SLEEP_DEFAULT)
+    assert lpf.get().attrib["checked"] == "true", "❌ LPF恢复失败"
+
+    print("✅ 所有滤波开关操作测试通过")
 
 def test_start_data_collection(device_driver):
     """开始数据采集"""
-    # device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    # device_driver(description=DESC_START).click()
-    # time.sleep(SLEEP_DEFAULT)
-
     swipe_to_bottom(device_driver)
-
     device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DATA_COLLECT_BDF).click()
     time.sleep(SLEEP_DEFAULT)
-
     click_if_exists(device_driver, DESC_ALWAYS_ALLOW)
-
-    collect_running = device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    assert collect_running, "❌ 采集开启失败"
+    assert device_driver(description=DESC_STOP_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 采集开启失败"
 
 def test_stop_data_collection(device_driver):
     """停止数据采集"""
@@ -248,25 +251,21 @@ def test_stop_data_collection(device_driver):
     device_driver(description=DESC_STOP_COLLECT_BDF).click()
     time.sleep(SLEEP_DEFAULT)
 
-    stop_success = device_driver(description=DESC_CONFIRM).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    assert stop_success, "❌ 停止采集失败"
-
+    assert device_driver(description=DESC_CONFIRM).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 停止采集失败"
     device_driver(description=DESC_CONFIRM).click()
     time.sleep(SLEEP_DEFAULT)
+
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+    assert device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 返回设备页面失败"
 
-    is_back_success = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    assert is_back_success, "❌ 返回设备页面失败"
-
-@pytest.mark.skip('skpi test_enter_data_distribution')
+@pytest.mark.skip('skip test_enter_data_distribution')
 def test_enter_data_distribution(device_driver):
     """进入数据分发页面"""
     device_driver(description=DESC_DATA_DISTRIBUTION_LSL).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DATA_DISTRIBUTION_LSL).click()
     time.sleep(SLEEP_DEFAULT)
-
-    click_if_exists(device_driver, DESC_ALLOW_WHEN_USING, timeout=WAIT_TIMEOUT_VERY_SHORT)
+    click_if_exists(device_driver, DESC_ALLOW_WHEN_USING)
     time.sleep(SLEEP_DEFAULT)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
@@ -277,13 +276,11 @@ def test_check_product_info(device_driver):
     device_driver(description=DESC_VIEW_PRODUCT_INFO).click()
     time.sleep(SLEEP_DEFAULT)
 
-    page_text = get_page_text(device_driver)
-    assert any(kw in page_text for kw in OCR_KEY_PRODUCT_INFO), "❌ 产品信息页面异常"
+    assert device_driver(descriptionContains=DEVICE_ADDRESS).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入产品信息页面"
 
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-    is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    assert is_back_ok, "❌ 返回设备页面失败"
+    assert device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 返回就绪页面失败"
 
 def test_enter_about_page(device_driver):
     """进入关于页面"""
@@ -291,18 +288,15 @@ def test_enter_about_page(device_driver):
     device_driver(description=DESC_ABOUT).click()
     time.sleep(SLEEP_DEFAULT)
 
-    page_text = get_page_text(device_driver)
-    assert any(kw in page_text for kw in OCR_KEY_ABOUT_PAGE), "❌ 关于页面内容异常"
+    assert device_driver(descriptionContains=SOFTWARE_NAME).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入关于页面"
     time.sleep(SLEEP_DEFAULT)
-    # assert click_text_by_ocr(device_driver, OCR_KEY_ABOUT_PAGE[0])
-    # time.sleep(SLEEP_DEFAULT)
+
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
 
-
 # ========================= 统一用例入口 =========================
 def run_all_test_cases(device_driver):
-    """一轮完整测试流程（所有业务用例）"""
+    """一轮完整测试流程"""
     test_agree_privacy_policy(device_driver)
     test_start_device_scan(device_driver)
     test_connect_first_detected_device(device_driver)
@@ -313,12 +307,10 @@ def run_all_test_cases(device_driver):
     test_check_product_info(device_driver)
     test_enter_about_page(device_driver)
 
-
 # ========================= 主测试函数 =========================
-@pytest.mark.skip(' skip test_main_auto_run')
+@pytest.mark.skip('skip test_main_auto_run')
 def test_main_auto_run():
     """压力测试（每次循环重启APP）"""
-    import uiautomator2 as u2
     refresh_test_params()
     print(f"\n🚀 开始执行压力测试，总轮次：{execute_total_times}")
 
@@ -328,23 +320,18 @@ def test_main_auto_run():
         print(f"📌 第 {i}/{execute_total_times} 轮测试开始")
         print(f"=====================================\n")
 
-        # ==============================================
-        # ✅ 每次循环都：重启 APP
-        # ==============================================
         driver = u2.connect()
         driver.app_stop(APP_PACKAGE_NAME)
         time.sleep(1)
         driver.app_start(APP_PACKAGE_NAME, stop=True)
         time.sleep(SLEEP_DEFAULT)
 
-        # 执行一轮全量用例
         run_all_test_cases(driver)
 
-        # 关闭 APP，准备下一轮重启
         driver.app_stop(APP_PACKAGE_NAME)
         time.sleep(2)
-
         print(f"\n✅ 第 {i} 轮执行完成")
+
         refresh_test_params()
         time.sleep(case_interval_seconds)
 

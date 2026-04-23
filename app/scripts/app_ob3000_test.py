@@ -39,9 +39,15 @@ DESC_FIND_DEVICE = "查找设备"
 DESC_READY = "就绪"
 TEXT_AGREE_PRIVACY = "确定"
 
-# ====================== OCR 校验关键字 ======================
-OCR_KEY_PRODUCT_INFO = ["设备地址"]
-OCR_KEY_ABOUT_PAGE = ["软件名称"]
+# ====================== 滤波开关定义 ======================
+DESC_50HZ_FILTER = "50Hz滤除："
+DESC_60HZ_FILTER = "60Hz滤除："
+DESC_HPF_FILTER = "HPF："
+DESC_LPF_FILTER = "LPF ："
+
+# ====================== 校验关键字 ======================
+DEVICE_ADDRESS = "设备地址"
+SOFTWARE_NAME = "软件名称"
 
 # ====================== 全局配置 ======================
 # 开关点击偏移量（根据你的设备分辨率修改）
@@ -194,42 +200,121 @@ def test_navigate_to_waveform(device_driver):
     is_page_open = device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     assert is_page_open, "❌ 进入波形页面失败"
 
+# def test_filter_choose(device_driver):
+#     """测试滤波开关"""
+#     device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
+#     device_driver(description=DESC_START).click()
+#     time.sleep(SLEEP_DEFAULT)
+#
+#     # 50Hz滤除：打开 → 关闭
+#     assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#     assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#
+#     # 60Hz滤除：打开 → 关闭
+#     assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#     assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#
+#     # HPF：打开 → 关闭
+#     assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#     assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#
+#     # LPF：打开 → 关闭
+#     assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+#     assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+#     time.sleep(SLEEP_DEFAULT)
+
 def test_filter_choose(device_driver):
-    """测试滤波开关"""
+    """测试滤波开关操作"""
+    # 步骤1：校验返回按钮存在并点击（确认页面加载完成）
     device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_START).click()
     time.sleep(SLEEP_DEFAULT)
 
-    # 50Hz滤除：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "50Hz滤除", offset_x=SWITCH_OFFSET_X), "50Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    # ========== 50Hz滤除开关 ==========
+    assert device_driver(description=DESC_50HZ_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), \
+        "❌ 未找到50Hz滤除文本元素"
+    filter_50hz_xpath = device_driver.xpath('//android.widget.Switch[1]')
+    assert filter_50hz_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到50Hz滤除开关"
 
-    # 60Hz滤除：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
+    # 点击：获取控件范围 → 点右侧 85%
+    x1, y1, x2, y2 = filter_50hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "60Hz滤除", offset_x=SWITCH_OFFSET_X), "60Hz滤除 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    filter_50hz_switch = filter_50hz_xpath.get()
+    assert filter_50hz_switch.attrib["checked"] == "false", "❌ 50Hz滤除开关关闭失败"
 
-    # HPF：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
+    # 恢复
+    x1, y1, x2, y2 = filter_50hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "HPF", offset_x=SWITCH_OFFSET_X), "HPF 点击失败"
-    time.sleep(SLEEP_DEFAULT)
+    filter_50hz_switch = filter_50hz_xpath.get()
+    assert filter_50hz_switch.attrib["checked"] == "true", "❌ 50Hz滤除开关恢复失败"
 
-    # LPF：打开 → 关闭
-    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    # ========== 60Hz滤除开关 ==========
+    assert device_driver(description=DESC_60HZ_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), \
+        "❌ 未找到60Hz滤除文本元素"
+    filter_60hz_xpath = device_driver.xpath('//android.widget.Switch[@index="1"]')
+    assert filter_60hz_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到60Hz滤除开关"
+
+    x1, y1, x2, y2 = filter_60hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
     time.sleep(SLEEP_DEFAULT)
-    assert click_text_by_ocr(device_driver, "LPF", offset_x=SWITCH_OFFSET_X), "LPF 点击失败"
+    filter_60hz_switch = filter_60hz_xpath.get()
+    assert filter_60hz_switch.attrib["checked"] == "false", "❌ 60Hz滤除开关关闭失败"
+
+    x1, y1, x2, y2 = filter_60hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
     time.sleep(SLEEP_DEFAULT)
+    filter_60hz_switch = filter_60hz_xpath.get()
+    assert filter_60hz_switch.attrib["checked"] == "true", "❌ 60Hz滤除开关恢复失败"
+
+    # ========== HPF开关 ==========
+    assert device_driver(description=DESC_HPF_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), \
+        "❌ 未找到HPF文本元素"
+    hpf_xpath = device_driver.xpath('//android.widget.Switch[@index="2"]')
+    assert hpf_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到HPF开关"
+
+    x1, y1, x2, y2 = hpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    hpf_switch = hpf_xpath.get()
+    assert hpf_switch.attrib["checked"] == "false", "❌ HPF开关关闭失败"
+
+    x1, y1, x2, y2 = hpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    hpf_switch = hpf_xpath.get()
+    assert hpf_switch.attrib["checked"] == "true", "❌ HPF开关恢复失败"
+
+    # ========== LPF开关 ==========
+    assert device_driver(description=DESC_LPF_FILTER).wait(timeout=WAIT_TIMEOUT_NORMAL), \
+        "❌ 未找到LPF文本元素"
+    lpf_xpath = device_driver.xpath('//android.widget.Switch[@index="3"]')
+    assert lpf_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到LPF开关"
+
+    x1, y1, x2, y2 = lpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    lpf_switch = lpf_xpath.get()
+    assert lpf_switch.attrib["checked"] == "false", "❌ LPF开关关闭失败"
+
+    x1, y1, x2, y2 = lpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    lpf_switch = lpf_xpath.get()
+    assert lpf_switch.attrib["checked"] == "true", "❌ LPF开关恢复失败"
+
+    print("✅ 所有滤波开关操作测试通过")
 
 def test_start_data_collection(device_driver):
     """开始数据采集"""
-    # device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    # device_driver(description=DESC_START).click()
-    # time.sleep(SLEEP_DEFAULT)
-
     swipe_to_bottom(device_driver)
 
     device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
@@ -276,8 +361,7 @@ def test_check_product_info(device_driver):
     device_driver(description=DESC_VIEW_PRODUCT_INFO).click()
     time.sleep(SLEEP_DEFAULT)
 
-    page_text = get_page_text(device_driver)
-    assert any(kw in page_text for kw in OCR_KEY_PRODUCT_INFO), "❌ 产品信息页面异常"
+    assert device_driver(descriptionContains=DEVICE_ADDRESS).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入产品信息页面"
 
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
@@ -290,13 +374,14 @@ def test_enter_about_page(device_driver):
     device_driver(description=DESC_ABOUT).click()
     time.sleep(SLEEP_DEFAULT)
 
-    page_text = get_page_text(device_driver)
-    assert any(kw in page_text for kw in OCR_KEY_ABOUT_PAGE), "❌ 关于页面内容异常"
+    assert device_driver(descriptionContains=SOFTWARE_NAME).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入关于页面"
     time.sleep(SLEEP_DEFAULT)
-    # assert click_text_by_ocr(device_driver, OCR_KEY_ABOUT_PAGE[0])
-    # time.sleep(SLEEP_DEFAULT)
+
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+
+    is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_back_ok, "❌ 返回设备页面失败"
 
 # ========================= 统一用例入口 =========================
 def run_all_test_cases(device_driver):
