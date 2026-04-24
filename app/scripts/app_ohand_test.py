@@ -4,6 +4,8 @@
 流程：启动APP → 同意隐私协议 → 扫描设备 → 连接设备 → 关闭APP
 全局控制：支持暂停、停止、动态参数刷新
 """
+import random
+
 import uiautomator2 as u2
 import pytest
 import time
@@ -28,8 +30,10 @@ DESC_VIEW_WAVEFORM = "波形/阈值"
 DESC_CONNECT = "连接"
 DESC_FIND_DEVICE = "查找设备"
 DESC_READY = "就绪"
+DESC_START = "开始"
 TEXT_AGREE_PRIVACY = "确定"
 DESC_VIEW_PRODUCT_INFO = "查看产品信息"
+DESC_ABOUT = "关于"
 DESC_DEBUG_INFO = "查看调试信息"
 
 # 👉 补充缺失的菜单
@@ -37,8 +41,9 @@ DESC_GESTURE_SETTINGS = "手势设置"
 DESC_DEVICE_CONTROL = "设备控制"
 DESC_CLOUD_SETTINGS = "云端设置"
 
-# ====================== OCR 校验关键字 ======================
-OCR_KEY_PRODUCT_INFO = ["设备地址"]
+# ====================== 校验关键字 ======================
+DEVICE_ADDRESS = "设备地址"
+SOFTWARE_NAME = "软件名称"
 
 # ====================== 全局配置 ======================
 SWITCH_OFFSET_X = 450
@@ -179,10 +184,153 @@ def test_navigate_to_waveform(device_driver):
     device_driver(description=DESC_VIEW_WAVEFORM).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_VIEW_WAVEFORM).click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+    # assert device_driver(description=DESC_START).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 进入波形页面失败"
+
+def test_waveform_type_switch(device_driver):
+    """波形类型切换（第二步随机三选一）"""
+    # 1. 等待页面加载
+    assert device_driver(description="波形/阈值").wait(timeout=10), "❌ 未进入波形/阈值页面"
+
+    type_none = "NONE"
+    type_emg = "EMG"
+    type_raw = "RAW"
+    type_dc = "DC"
+    type_ac = "AC"
+
+    # 随机三选一列表
+    random_options = [type_raw, type_dc, type_ac]
+    selected_random = random.choice(random_options)  # 随机选中一个
+
+    # ========================
+    # 第一步：点开菜单 → 切换到 NONE
+    # ========================
+    if device_driver(description=type_none).wait(timeout=2):
+        current_btn = device_driver(description=type_none)
+    elif device_driver(description=type_emg).wait(timeout=2):
+        current_btn = device_driver(description=type_emg)
+    elif device_driver(description=type_raw).wait(timeout=2):
+        current_btn = device_driver(description=type_raw)
+    elif device_driver(description=type_dc).wait(timeout=2):
+        current_btn = device_driver(description=type_dc)
+    else:
+        current_btn = device_driver(description=type_ac)
+
+    current_btn.click()
+    time.sleep(1)
+
+    # 选择 NONE
+    device_driver(description=type_none).wait(timeout=5)
+    device_driver(description=type_none).click()
+    time.sleep(2)
+    assert device_driver(description=type_none).wait(timeout=5), "❌ 切换到NONE失败"
+
+    # ========================
+    # 第二步：从 NONE → 随机三选一
+    # ========================
+    device_driver(description=type_none).click()
+    time.sleep(1)
+
+    device_driver(description=selected_random).wait(timeout=5)
+    device_driver(description=selected_random).click()
+    time.sleep(2)
+    assert device_driver(description=selected_random).wait(timeout=5), f"❌ 切换到{selected_random}失败"
+
+    # ========================
+    # 第三步：最后切换到 EMG
+    # ========================
+    device_driver(description=selected_random).click()
+    time.sleep(1)
+
+    device_driver(description=type_emg).wait(timeout=5)
+    device_driver(description=type_emg).click()
+    time.sleep(2)
+    assert device_driver(description=type_emg).wait(timeout=5), "❌ 切换到EMG失败"
+
+    print(f"✅ 波形类型切换完成！随机选择了：{selected_random}，最终切换到EMG！")
+
+def test_sensor_type_switch(device_driver):
+    """传感器类型切换"""
+    # 1. 等待页面加载
+    assert device_driver(description="波形/阈值").wait(timeout=10), "❌ 未进入波形/阈值页面"
+
+    normal_sensor = "普通肌电传感器"
+    button_sensor = "按钮开关/包络线传感器"
+
+    # 2. 等待并点击传感器按钮（展开下拉）
+    if device_driver(description=normal_sensor).wait(timeout=2):
+        sensor = device_driver(description=normal_sensor)
+    else:
+        sensor = device_driver(description=button_sensor)
+
+    assert sensor.wait(timeout=5), "❌ 未找到传感器按钮"
+    sensor.click()
+    time.sleep(1)
+
+    # 3. 选择 按钮开关/包络线传感器
+    target_option = device_driver(description=button_sensor)
+    assert target_option.wait(timeout=5), "❌ 未找到选项"
+    target_option.click()
+    time.sleep(2)  # 等待界面刷新
+
+    # 4. 验证切换成功（第一次）
+    assert device_driver(description=button_sensor).wait(timeout=5), "❌ 切换失败"
+
+    # 5. 再次点开下拉，切回普通肌电传感器
+    sensor_switch = device_driver(description=button_sensor)
+    sensor_switch.click()
+    time.sleep(1)
+
+    back_option = device_driver(description=normal_sensor)
+    back_option.click()
+    time.sleep(2)
+
+    # 6. 验证切回成功
+    assert device_driver(description=normal_sensor).wait(timeout=10), "❌ 恢复失败"
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+    print("✅ 传感器类型切换 测试通过！")
+
+def test_flexor_seekbar_swipe(device_driver):
+    """屈肌信号阈值"""
+    assert device_driver(description="波形/阈值").wait(timeout=10), "页面错误"
+
+    # 找到屈肌标签
+    label = device_driver(description="屈肌信号阈值")
+    # 取所有同级SeekBar中的第0个（上方屈肌）
+    seekbar = label.sibling(className="android.widget.SeekBar")[0]
+    seekbar.wait(timeout=5)
+
+    # 垂直滑动
+    seekbar.swipe("down", 0.0)
+    time.sleep(0.5)
+    seekbar.swipe("up", 1.0)
+    time.sleep(0.5)
+
+    print("✅ 屈肌【上方】滑动条 测试通过！")
+
+
+def test_extensor_seekbar_swipe(device_driver):
+    """伸肌信号阈值"""
+    assert device_driver(description="波形/阈值").wait(timeout=10), "页面错误"
+
+    # 找到伸肌标签
+    label = device_driver(description="伸肌信号阈值")
+    # 取所有同级SeekBar中的第1个（下方伸肌）
+    seekbar = label.sibling(className="android.widget.SeekBar")[1]
+    seekbar.wait(timeout=5)
+
+    # 垂直滑动
+    seekbar.swipe("down", 0.0)
+    time.sleep(0.5)
+    seekbar.swipe("up", 1.0)
+    time.sleep(0.5)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+    print("✅ 伸肌【下方】滑动条 测试通过！")
 
-# ====================== 【补充】缺失的3个菜单 ======================
+
 def test_enter_gesture_settings(device_driver):
     """进入手势设置"""
     device_driver(description=DESC_GESTURE_SETTINGS).wait(timeout=WAIT_TIMEOUT_NORMAL)
@@ -190,7 +338,7 @@ def test_enter_gesture_settings(device_driver):
     time.sleep(SLEEP_DEFAULT)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-
+#
 def test_enter_device_control(device_driver):
     """进入设备控制"""
     device_driver(description=DESC_DEVICE_CONTROL).wait(timeout=WAIT_TIMEOUT_NORMAL)
@@ -204,31 +352,62 @@ def test_enter_cloud_settings(device_driver):
     device_driver(description=DESC_CLOUD_SETTINGS).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_CLOUD_SETTINGS).click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+
+def test_restore_default_settings(device_driver):
+    """恢复默认设置"""
+    # 1. 等待设置页面加载
+    assert device_driver(description="云端设置").wait(timeout=10), "未进入设置页面"
+
+    # 2. 点击【恢复默认设置】按钮
+    restore_btn = device_driver(description="恢复默认设置")
+    restore_btn.wait(timeout=5)
+    restore_btn.click()
+    time.sleep(1)  # 等待确认弹窗出现
+
+    # 3. 点击确认弹窗的【确定】
+    confirm_ok_btn = device_driver(description="确定")
+    confirm_ok_btn.wait(timeout=5)
+    confirm_ok_btn.click()
+    time.sleep(2)  # 等待恢复完成，成功弹窗出现
+
+    # 4. 点击成功弹窗的【确定】
+    success_ok_btn = device_driver(description="确定")
+    success_ok_btn.wait(timeout=5)
+    success_ok_btn.click()
+    time.sleep(1)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+    print("✅ 恢复默认设置 完整流程执行成功（含两个弹窗确认）")
 
-# ====================== 原有功能 ======================
 def test_check_product_info(device_driver):
     """查看产品信息"""
     device_driver(description=DESC_VIEW_PRODUCT_INFO).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_VIEW_PRODUCT_INFO).click()
     time.sleep(SLEEP_DEFAULT)
 
-    page_text = get_page_text(device_driver)
-    assert any(kw in page_text for kw in OCR_KEY_PRODUCT_INFO), "❌ 产品信息页面异常"
+    assert device_driver(descriptionContains=DEVICE_ADDRESS).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入产品信息页面"
 
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-    # is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
-    # assert is_back_ok, "❌ 返回设备页面失败"
+    is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_back_ok, "❌ 返回设备页面失败"
 
-def test_enter_about_page(device_driver):
-    """进入查看调试信息"""
+def test_enter_debug_page(device_driver):
+    """进入关于页面"""
     device_driver(description=DESC_DEBUG_INFO).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DEBUG_INFO).click()
     time.sleep(SLEEP_DEFAULT)
+
+    # assert device_driver(descriptionContains=SOFTWARE_NAME).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入关于页面"
+    # time.sleep(SLEEP_DEFAULT)
+
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
+
+    is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_back_ok, "❌ 返回设备页面失败"
 
 # ========================= 统一用例入口（已清理无效用例） =========================
 def run_all_test_cases(device_driver):
@@ -238,14 +417,23 @@ def run_all_test_cases(device_driver):
     test_connect_first_detected_device(device_driver)
     test_navigate_to_waveform(device_driver)
 
-    # 补充的3个菜单
+    # 波形/阈值页面内部用例
+    test_waveform_type_switch(device_driver)
+    test_sensor_type_switch(device_driver)
+    test_flexor_seekbar_swipe(device_driver)
+    test_extensor_seekbar_swipe(device_driver)
+
+    # 三级菜单：手势设置 / 设备控制 / 云端设置
     test_enter_gesture_settings(device_driver)
     test_enter_device_control(device_driver)
-    test_enter_cloud_settings(device_driver)
 
-    # 原有页面
+    # 云端设置 + 恢复默认设置
+    test_enter_cloud_settings(device_driver)
+    test_restore_default_settings(device_driver)
+
+    # 设备信息相关
     test_check_product_info(device_driver)
-    test_enter_about_page(device_driver)
+    test_enter_debug_page(device_driver)
 
 # ========================= 主测试函数 =========================
 @pytest.mark.skip(' skip test_main_auto_run')
