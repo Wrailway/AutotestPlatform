@@ -338,12 +338,110 @@ def test_enter_gesture_settings(device_driver):
     time.sleep(SLEEP_DEFAULT)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-#
+
 def test_enter_device_control(device_driver):
     """进入设备控制"""
     device_driver(description=DESC_DEVICE_CONTROL).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DEVICE_CONTROL).click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+
+def test_device_control_actions(device_driver):
+    """设备控制27个手势"""
+    # 等待页面加载
+    assert device_driver(description="设备控制").wait(timeout=10), "未进入设备控制页面"
+
+    # ======================
+    # 第一屏：执行 0~20 共21个手势
+    # ======================
+    gesture_images = device_driver(className="android.widget.ImageView", clickable=True)
+    gesture_count = gesture_images.count
+    print('第一屏手势数量:', gesture_count)
+
+    for i in range(21):
+        check_test_stop_pause()
+
+        # 1. 先点 展开 按钮
+        device_driver(description="展开").click()
+        time.sleep(1)
+
+        # 展开弹窗1 确定
+        device_driver(description="确定").click()
+        time.sleep(2)
+
+        # 展开弹窗2 确定（存在才点）
+        if device_driver(description="确定").wait(timeout=2):
+            device_driver(description="确定").click()
+            time.sleep(1)
+
+        # ======================
+        # 2. 再点 手势图片
+        # ======================
+        gesture_images[i].click()
+        time.sleep(1)
+
+        # 图片弹窗1 确定
+        device_driver(description="确定").click()
+        time.sleep(2)
+
+        # 图片弹窗2 确定
+        if device_driver(description="确定").wait(timeout=2):
+            device_driver(description="确定").click()
+            time.sleep(1)
+
+        print(f"✅ 第一屏 第 {i+1}/21 项执行完成")
+
+    # ======================
+    # 向上滑动屏幕
+    # ======================
+    print("ℹ️ 第一屏完成，开始向上滑动...")
+    device_driver.swipe(0.5, 0.8, 0.5, 0.2, 0.5)
+    time.sleep(2)
+
+    # ======================
+    # 第二屏：从 15 开始（第16个）
+    # ======================
+    gesture_images_after_swipe = device_driver(className="android.widget.ImageView", clickable=True)
+    gesture_count_after = gesture_images_after_swipe.count
+    print('滑动后手势数量:', gesture_count_after)
+
+    for i in range(15, gesture_count_after):
+        check_test_stop_pause()
+
+        # ======================
+        # 1. 先滑上去 → 显示展开按钮
+        # ======================
+        device_driver.swipe(0.5, 0.8, 0.5, 0.2, 0.5)  # 上滑
+        time.sleep(1)
+
+        # 点展开 + 处理弹窗
+        device_driver(description="展开").click()
+        time.sleep(1)
+        device_driver(description="确定").click()
+        time.sleep(2)
+        if device_driver(description="确定").wait(timeout=2):
+            device_driver(description="确定").click()
+            time.sleep(1)
+
+        # ======================
+        # 2. 再滑下来 → 回到当前图片位置
+        # ======================
+        device_driver.swipe(0.5, 0.2, 0.5, 0.8, 0.5)  # 下滑回原位
+        time.sleep(2)
+
+        # 3. 点击手势图片
+        gesture_images_after_swipe[i].click()
+        time.sleep(1)
+        device_driver(description="确定").click()
+        time.sleep(2)
+        if device_driver(description="确定").wait(timeout=2):
+            device_driver(description="确定").click()
+            time.sleep(1)
+
+        print(f"✅ 滑动后 第 {i + 1}/{gesture_count_after} 项执行完成")
+
+    print("✅ 设备控制所有动作完成")
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
 
@@ -426,6 +524,7 @@ def run_all_test_cases(device_driver):
     # 三级菜单：手势设置 / 设备控制 / 云端设置
     test_enter_gesture_settings(device_driver)
     test_enter_device_control(device_driver)
+    test_device_control_actions(device_driver)
 
     # 云端设置 + 恢复默认设置
     test_enter_cloud_settings(device_driver)
