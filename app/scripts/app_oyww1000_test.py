@@ -29,12 +29,18 @@ DESC_BACK = "返回"
 DESC_CONFIRM = "确定"
 
 DESC_VIEW_WAVEFORM = "查看波形"
+DESC_START = "返回"
+DESC_HPF_FILTER = "HPF高通滤波"
+DESC_50HZ_FILTER = "50Hz/60Hz工频滤波"
+DESC_LPF_FILTER = "LPF低通滤波"
+
 DESC_GESTURE_TRAIN = "手势训练"
 DESC_MODEL_DOWNLOAD = "模型下载"
 DESC_VIEW_GESTURE = "查看手势"
 DESC_PREDEFINE_PARAMS = "预定义参数设置"
 DESC_VIEW_PRODUCT_INFO = "查看产品信息"
 DESC_ABOUT = "关于"
+
 
 # ====================== 全局控制 ======================
 def check_test_stop_pause():
@@ -114,8 +120,62 @@ def test_connect_device(device_driver):
 def test_enter_waveform(device_driver):
     """查看波形"""
     click_if_exists(device_driver, DESC_VIEW_WAVEFORM)
-    device_driver.press("back")
+    # device_driver.press("back")
     print("✅ 查看波形")
+
+def test_filter_choose(device_driver):
+    """测试滤波开关操作"""
+    # ========== HPF开关 ==========
+    hpf_xpath = device_driver.xpath('//android.widget.Switch[1]')
+    assert hpf_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到HPF开关"
+
+    # 点击：获取控件范围 → 点右侧 85%
+    x1, y1, x2, y2 = hpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    hpf_switch = hpf_xpath.get()
+    assert hpf_switch.attrib["checked"] == "false", "❌ HPF开关关闭失败"
+
+    # 恢复
+    x1, y1, x2, y2 = hpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    hpf_switch = hpf_xpath.get()
+    assert hpf_switch.attrib["checked"] == "true", "❌ HPF开关恢复失败"
+
+    # ========== 50Hz/60Hz滤除开关 ==========
+    filter_50hz_xpath = device_driver.xpath('//android.widget.Switch[2]')
+    assert filter_50hz_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到50Hz滤除开关"
+
+    x1, y1, x2, y2 = filter_50hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    filter_50hz_switch = filter_50hz_xpath.get()
+    assert filter_50hz_switch.attrib["checked"] == "false", "❌ 50Hz滤除开关关闭失败"
+
+    x1, y1, x2, y2 = filter_50hz_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    filter_50hz_switch = filter_50hz_xpath.get()
+    assert filter_50hz_switch.attrib["checked"] == "true", "❌ 50Hz滤除开关恢复失败"
+
+    # ========== LPF开关 ==========
+    lpf_xpath = device_driver.xpath('//android.widget.Switch[3]')
+    assert lpf_xpath.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到LPF开关"
+
+    x1, y1, x2, y2 = lpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    lpf_switch = lpf_xpath.get()
+    assert lpf_switch.attrib["checked"] == "false", "❌ LPF开关关闭失败"
+
+    x1, y1, x2, y2 = lpf_xpath.bounds
+    device_driver.click(int(x1 + (x2-x1)*0.85), (y1+y2)//2)
+    time.sleep(SLEEP_DEFAULT)
+    lpf_switch = lpf_xpath.get()
+    assert lpf_switch.attrib["checked"] == "true", "❌ LPF开关恢复失败"
+    device_driver.press("back")
+    print("✅ 所有滤波开关操作测试通过")
 
 def test_enter_gesture_train(device_driver):
     """手势训练"""
