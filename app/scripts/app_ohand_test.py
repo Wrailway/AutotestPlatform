@@ -358,26 +358,21 @@ def test_device_control_actions(device_driver):
     gesture_images = device_driver(className="android.widget.ImageView", clickable=True)
     gesture_count = gesture_images.count
     print('第一屏手势数量:', gesture_count)
+    # # 1. 先点 展开 按钮
+    device_driver(description="展开").click()
+    time.sleep(1)
+
+    # 展开弹窗1 确定
+    device_driver(description="确定").click()
+    time.sleep(2)
+
+    # 展开弹窗2 确定（存在才点）
+    if device_driver(description="确定").wait(timeout=2):
+        device_driver(description="确定").click()
+        time.sleep(1)
 
     for i in range(21):
         check_test_stop_pause()
-
-        # 1. 先点 展开 按钮
-        device_driver(description="展开").click()
-        time.sleep(1)
-
-        # 展开弹窗1 确定
-        device_driver(description="确定").click()
-        time.sleep(2)
-
-        # 展开弹窗2 确定（存在才点）
-        if device_driver(description="确定").wait(timeout=2):
-            device_driver(description="确定").click()
-            time.sleep(1)
-
-        # ======================
-        # 2. 再点 手势图片
-        # ======================
         gesture_images[i].click()
         time.sleep(1)
 
@@ -408,29 +403,6 @@ def test_device_control_actions(device_driver):
 
     for i in range(15, gesture_count_after):
         check_test_stop_pause()
-
-        # ======================
-        # 1. 先滑上去 → 显示展开按钮
-        # ======================
-        device_driver.swipe(0.5, 0.8, 0.5, 0.2, 0.5)  # 上滑
-        time.sleep(1)
-
-        # 点展开 + 处理弹窗
-        device_driver(description="展开").click()
-        time.sleep(1)
-        device_driver(description="确定").click()
-        time.sleep(2)
-        if device_driver(description="确定").wait(timeout=2):
-            device_driver(description="确定").click()
-            time.sleep(1)
-
-        # ======================
-        # 2. 再滑下来 → 回到当前图片位置
-        # ======================
-        device_driver.swipe(0.5, 0.2, 0.5, 0.8, 0.5)  # 下滑回原位
-        time.sleep(2)
-
-        # 3. 点击手势图片
         gesture_images_after_swipe[i].click()
         time.sleep(1)
         device_driver(description="确定").click()
