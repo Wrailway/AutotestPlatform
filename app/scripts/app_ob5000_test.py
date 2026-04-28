@@ -313,6 +313,128 @@ def test_filter_choose(device_driver):
 
     print("✅ 所有滤波开关操作测试通过")
 
+
+def test_wave_zoom_out(device_driver):
+    """波形页面-放大按钮"""
+
+    zoom_out_btn = device_driver.xpath(
+        '//android.view.View[@scrollable="true"]'
+        '/android.view.View[1]'
+        '/android.view.View[2]'
+    )
+
+    zoom_out_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    zoom_out_btn.click()
+
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 放大按钮测试完成（纯层级定位）")
+
+def test_wave_eeg_filter_setting(device_driver):
+    """波形页面-EEG滤波设置"""
+    # EEG滤波按钮（从你XML真实获取：Button[1]，对应index=1）
+    filter_btn = device_driver.xpath('//android.widget.Button[1]')
+    filter_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 滤波选项（和你界面完全一致）
+    filter_list = [
+        "δ(0.5~4 HZ)",
+        "θ(4~8 HZ)",
+        "α (8~13 HZ)",
+        "β (13~30 HZ)",
+        "γ (30~45 HZ)",
+        "标准(0.5~45 HZ)"
+    ]
+    selected = random.sample(filter_list, 3)
+
+    # 随机选择3个（写法和电压/时长完全一致）
+    for val in selected:
+        filter_btn.click()
+        time.sleep(2)
+        device_driver(description=val).wait(timeout=SLEEP_DEFAULT)
+        device_driver(description=val).click()
+        time.sleep(5)
+
+    # 恢复默认：无（和电压恢复写法对齐）
+    filter_btn.click()
+    time.sleep(1)
+    device_driver(description="无").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="无").click()
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ EEG滤波测试完成：随机3个选项 → 恢复默认无")
+
+import random
+
+def test_wave_duration_setting(device_driver):
+    """波形页面-时长设置"""
+    # 时长按钮（根据你XML，是第3个Button，index=3 → XPath写[3]）
+    duration_btn = device_driver.xpath('//android.widget.Button[2]')
+    duration_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 时长选项（和你界面完全一致）
+    duration_list = [
+        "1s",
+        "5s",
+        "10s"
+    ]
+    selected = random.sample(duration_list, len(duration_list))  # 遍历所有选项
+
+    # 依次选择每个时长（写法和电压/EEG滤波完全对齐）
+    for val in selected:
+        duration_btn.click()
+        time.sleep(2)
+        device_driver(description=val).wait(timeout=SLEEP_DEFAULT)
+        device_driver(description=val).click()
+        time.sleep(5)
+
+    # 恢复默认：10s（和其他下拉框恢复逻辑一致）
+    duration_btn.click()
+    time.sleep(1)
+    device_driver(description="10s").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="10s").click()
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ 时长测试完成：遍历所有选项 → 恢复默认10s")
+
+def test_switch_channel_right(device_driver):
+    """波形页面-向右箭头切换通道"""
+    right_arrow = device_driver.xpath('//android.widget.Button[3]')
+    right_arrow.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 点击向右切换
+    for ch in range(1, 8):
+        right_arrow.click()
+        time.sleep(5)
+        right_arrow = device_driver.xpath('//android.widget.Button[4]')
+
+    # 断言：按钮可点击，操作成功
+    assert right_arrow.wait(timeout=SLEEP_DEFAULT), "❌ 向右切换通道失败"
+
+    print("✅ 向右切换通道测试完成")
+
+
+def test_wave_zoom_in(device_driver):
+    """波形页面-缩小按钮"""
+    zoom_in_btn = device_driver.xpath('//android.widget.Button[@content-desc="缩小"]')
+
+    # 等待元素加载
+    zoom_in_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 点击缩小按钮
+    zoom_in_btn.click()
+
+    time.sleep(SLEEP_DEFAULT)
+
+    zoom_out_btn = device_driver.xpath(
+        '//android.view.View[@scrollable="true"]'
+        '/android.view.View[1]'
+        '/android.view.View[2]'
+    )
+    # 断言按钮存在，操作成功
+    assert  zoom_out_btn.wait(timeout=SLEEP_DEFAULT), "❌ 回到缩小界面失败"
+
+    print("✅ 缩小按钮测试完成")
+
 def test_start_data_collection(device_driver):
     """开始数据采集"""
     swipe_to_bottom(device_driver)
@@ -391,6 +513,13 @@ def run_all_test_cases(device_driver):
     test_connect_first_detected_device(device_driver)
     test_navigate_to_waveform(device_driver)
     test_filter_choose(device_driver)
+
+    test_wave_zoom_out(device_driver)
+    test_wave_eeg_filter_setting(device_driver)
+    test_wave_duration_setting(device_driver)
+    test_switch_channel_right(device_driver)
+    test_wave_zoom_in(device_driver)
+
     test_start_data_collection(device_driver)
     test_stop_data_collection(device_driver)
     test_enter_data_distribution(device_driver)

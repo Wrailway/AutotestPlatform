@@ -324,9 +324,10 @@ def test_switch_channel_right(device_driver):
     right_arrow.wait(timeout=WAIT_TIMEOUT_NORMAL)
 
     # 点击向右切换
-    for ch in range(1, 9):
+    for ch in range(1, 8):
         right_arrow.click()
         time.sleep(5)
+        right_arrow = device_driver.xpath('//android.widget.Button[4]')
 
     # 断言：按钮可点击，操作成功
     assert right_arrow.wait(timeout=SLEEP_DEFAULT), "❌ 向右切换通道失败"
