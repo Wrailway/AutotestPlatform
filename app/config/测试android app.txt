@@ -1,0 +1,72 @@
+
+uiautomator2（推荐，稳定 UI 定位）
+基于 Google UI Automator，支持按 ID / 文本 / XPath 定位，适合复杂 UI 测试
+pip install rapidocr-onnxruntime # OCR相关
+pip install --pre uiautomator2
+python -m uiautomator2 init  # 自动在设备安装守护进程
+
+
+ 实时查看当前界面：adb shell "while true; do dumpsys window | grep mCurrentFocus; sleep 1; clear; done"
+
+
+ 实时查看所有控件 ID / 文本 / 组件：
+C:\Users\wangr>adb shell uiautomator dump --verbose /sdcard/ui.xml
+adb pull /sdcard/ui.xml
+
+
+实时看界面截图
+adb exec-out screencap -p > screen.png
+
+使用OCR定位app元素：
+def click_text_by_ocr(driver, target_text, offset_x=0, offset_y=0):
+    """
+    增强版：支持偏移点击，专门点复选框/开关
+    :param offset_x: 水平偏移（正数向右，负数向左）
+    :param offset_y: 垂直偏移（正数向下，负数向上）
+    """
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        _ocr = RapidOCR()
+
+        img = driver.screenshot()
+        img.save("tmp_screenshot.png")
+        results, _ = _ocr("tmp_screenshot.png")
+
+        for item in results:
+            box = item[0]
+            text = item[1]
+
+            x_coords = [p[0] for p in box]
+            y_coords = [p[1] for p in box]
+
+            x1 = min(x_coords)
+            y1 = min(y_coords)
+            x2 = max(x_coords)
+            y2 = max(y_coords)
+
+            if target_text in text:
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
+
+                final_x = cx + offset_x
+                final_y = cy + offset_y
+
+                driver.click(final_x, final_y)
+                return True
+
+    except Exception as e:
+        print(f"⚠️ OCR异常: {e}")
+    return False
+
+def get_page_text(driver):
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        _ocr = RapidOCR()
+
+        img = driver.screenshot()
+        img.save("tmp_screenshot.png")
+        results, _ = _ocr("tmp_screenshot.png")
+        return " ".join([item[1] for item in results])
+    except Exception as e:
+        print(f"⚠️ OCR识别失败: {e}")
+    return ""
