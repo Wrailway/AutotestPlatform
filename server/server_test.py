@@ -286,6 +286,9 @@ class ServerTestWindow(QMainWindow):
     # 脚本加载
     # ------------------------------------------------------------------
     def on_load_script(self):
+        if self.pause_test:
+            self.status_bar.showMessage('当前有任务正在在运行，请勿重复加载脚本')
+            return
         self.selogger.log(f"正在选择测试脚本...")
         base_dir = os.path.dirname(os.path.abspath(__file__))
         scripts_dir = os.path.join(base_dir, "scripts")

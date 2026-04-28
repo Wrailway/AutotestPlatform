@@ -744,6 +744,9 @@ class RoHandTestWindow(QMainWindow):
     # ------------------------------------------------------------------
     def on_load_script(self):
         """加载测试脚本"""
+        if self.pause_test:
+            self.status_bar.showMessage('当前有任务正在在运行，请勿重复加载脚本')
+            return
         self.rologger.log(f'on_load_script')
         base_dir = os.path.dirname(os.path.abspath(__file__))
         scripts_dir = os.path.join(base_dir, "scripts")
