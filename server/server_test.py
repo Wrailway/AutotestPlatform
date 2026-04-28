@@ -413,11 +413,11 @@ class ServerTestWindow(QMainWindow):
 
         self.selogger.log("🛑 正在停止测试...")
         self.stop_test = True
-        self.pause_test = True
+        self.pause_test = False
 
-        self.runner_thread.set_pause(True)
+        self.runner_thread.set_pause(False)
         self.runner_thread.set_stop(True)
-        OperateSharedData.write_control(stop_test=True, pause_test=True)
+        OperateSharedData.write_control(stop_test=True, pause_test=False)
 
         self.pause_test_btn.setText("暂停测试")
         self.pause_test_btn.setEnabled(False)

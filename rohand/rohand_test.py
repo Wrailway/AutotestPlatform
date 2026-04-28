@@ -723,8 +723,8 @@ class RoHandTestWindow(QMainWindow):
             return
 
         self.stop_test = True
-        self.pause_test = True
-        OperateSharedData.write(stop_test=True, pause_test=True)
+        self.pause_test = False
+        OperateSharedData.write(stop_test=True, pause_test=False)
 
         self.status_bar.showMessage("正在停止任务...")
         self.progressbar_worker.stop()
