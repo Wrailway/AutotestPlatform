@@ -4,6 +4,8 @@
 流程：启动APP → 同意隐私协议 → 扫描设备 → 连接设备 → 关闭APP
 全局控制：支持暂停、停止、动态参数刷新
 """
+import random
+
 import uiautomator2 as u2
 import pytest
 import time
@@ -188,7 +190,7 @@ def test_start_device_scan(device_driver):
 def test_connect_first_detected_device(device_driver):
     """连接设备"""
     device_driver(description=DESC_CONNECT).click()
-    time.sleep(SLEEP_DEFAULT)
+    time.sleep(SLEEP_DEFAULT*2)
     is_connected = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_LONG)
     assert is_connected, "❌ 设备连接失败"
 
@@ -312,13 +314,259 @@ def test_filter_choose(device_driver):
 
     print("✅ 所有滤波开关操作测试通过")
 
+def test_switch_all_views(device_driver):
+    """波形界面：切换视图"""
+
+    # 右上角菜单按钮（保留你原来的写法）
+    menu_btn = device_driver.xpath('//*[@content-desc="波形图"]/following-sibling::android.widget.Button[1]')
+    assert menu_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到菜单按钮"
+
+    # 默认已是波形图
+    print("✅ 默认视图：波形图")
+
+    # ---------------------- 切换 IMU视图 ----------------------
+    menu_btn.click()
+    device_driver(description="IMU视图").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="IMU视图").click()
+    print("✅ 切换到：IMU视图")
+
+    # ---------------------- 切换 FFT视图 ----------------------
+    menu_btn = device_driver.xpath('//*[@content-desc="IMU视图"]/following-sibling::android.widget.Button[1]')
+    assert menu_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到菜单按钮"
+    menu_btn.click()
+    device_driver(description="FFT视图").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="FFT视图").click()
+    print("✅ 切换到：FFT视图")
+
+    # ---------------------- 切换 直方图 ----------------------
+    menu_btn = device_driver.xpath('//*[@content-desc="FFT视图"]/following-sibling::android.widget.Button[1]')
+    assert menu_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到菜单按钮"
+    menu_btn.click()
+    device_driver(description="直方图").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="直方图").click()
+    print("✅ 切换到：直方图")
+
+    # ---------------------- 切回 波形图 ----------------------
+    menu_btn = device_driver.xpath('//*[@content-desc="直方图"]/following-sibling::android.widget.Button[1]')
+    assert menu_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到菜单按钮"
+    menu_btn.click()
+    device_driver(description="波形图").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="波形图").click()
+    print("✅ 切回默认：波形图")
+
+    print("\n✅ 所有视图切换完成")
+
+def test_wave_zoom_out(device_driver):
+    """波形页面-放大按钮"""
+
+    zoom_out_btn = device_driver.xpath(
+        '//android.view.View[@scrollable="true"]'
+        '/android.view.View[1]'
+        '/android.view.View[2]'
+    )
+
+    zoom_out_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    zoom_out_btn.click()
+
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 放大按钮测试完成（纯层级定位）")
+
+def test_wave_unit_switch(device_driver):
+    """波形页面-单位切换：μV ↔ mV"""
+    # 定位 RadioButton：μV、mV
+    unit_mv = device_driver.xpath('//android.widget.RadioButton[1]')
+    unit_mv.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    unit_uv = device_driver.xpath('//android.widget.RadioButton[2]')
+    unit_uv.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 切换到 mV
+    unit_uv.click()
+    time.sleep(SLEEP_DEFAULT)
+    # 断言：单位切换到 mV 成功
+    assert unit_uv.wait(timeout=SLEEP_DEFAULT), "❌ 切换到 mV 失败"
+
+    # 再切回 μV（默认）
+    unit_mv.click()
+    time.sleep(SLEEP_DEFAULT)
+    # 断言：单位恢复到 μV 成功
+    assert unit_mv.wait(timeout=SLEEP_DEFAULT), "❌ 恢复到 μV 失败"
+
+    print("✅ 单位切换测试完成：mV → 恢复默认μV")
+
+
+def test_wave_voltage_setting(device_driver):
+    """波形页面-电压值"""
+    # 电压按钮（从你XML真实获取：Button[2]）
+    voltage_btn = device_driver.xpath('//android.widget.Button[1]')
+    voltage_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 电压值选项（和你界面一致）
+    voltage_list = [
+        "-10~10",
+        "-20~20",
+        "-50~50",
+        "-100~100",
+        "-200~200",
+        "-500~500",
+        "-1000~1000",
+        "-2000~2000",
+        "-5000~5000"
+    ]
+    selected = random.sample(voltage_list, 3)
+
+    # 随机选择3个（写法和时长完全一致）
+    for val in selected:
+        voltage_btn.click()
+        time.sleep(2)
+        device_driver(description=val).wait(timeout=SLEEP_DEFAULT)
+        device_driver(description=val).click()
+        time.sleep(5)
+
+    # 恢复默认：自适应（完全和你时长写法对齐）
+    voltage_btn.click()
+    time.sleep(1)
+    device_driver(description="自适应").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="自适应").click()
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ 电压值测试完成：随机3个范围 → 恢复默认自适应")
+
+def test_wave_eeg_filter_setting(device_driver):
+    """波形页面-EEG滤波设置"""
+    # EEG滤波按钮（从你XML真实获取：Button[1]，对应index=1）
+    filter_btn = device_driver.xpath('//android.widget.Button[2]')
+    filter_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 滤波选项（和你界面完全一致）
+    filter_list = [
+        "δ(0.5~4 Hz)",
+        "θ(4~8 Hz)",
+        "α (8~13 Hz)",
+        "β (13~30 Hz)",
+        "γ (30~45 Hz)",
+        "标准(0.5~45 HZ)"
+    ]
+    selected = random.sample(filter_list, 3)
+
+    # 随机选择3个（写法和电压/时长完全一致）
+    for val in selected:
+        filter_btn.click()
+        time.sleep(2)
+        device_driver(description=val).wait(timeout=SLEEP_DEFAULT)
+        device_driver(description=val).click()
+        time.sleep(5)
+
+    # 恢复默认：无（和电压恢复写法对齐）
+    filter_btn.click()
+    time.sleep(1)
+    device_driver(description="无").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="无").click()
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ EEG滤波测试完成：随机3个选项 → 恢复默认无")
+
+def test_wave_duration_setting(device_driver):
+    """波形页面-时长"""
+    # 打开时长按钮
+    duration_btn = device_driver.xpath('//android.widget.Button[3]')
+    duration_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    # 时长选项顺序
+    duration_list = ["1s", "2s", "5s", "10s", "20s", "30s", "60s"]
+    selected = random.sample(duration_list, 3)
+
+    for val  in selected:
+        duration_btn.click()
+        time.sleep(2)
+        device_driver(description=val).wait(timeout=SLEEP_DEFAULT)
+        device_driver(description=val).click()
+        time.sleep(5)
+
+    # 恢复默认 500ms
+    duration_btn.click()
+    time.sleep(0.8)
+    device_driver(description="500ms").wait(timeout=SLEEP_DEFAULT)
+    device_driver(description="500ms").click()
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ 时长测试完成：随机3个 → 恢复默认500ms")
+
+
+def test_switch_channel_right(device_driver):
+    """波形页面-向右箭头切换通道"""
+    right_arrow = device_driver.xpath('//android.widget.Button[4]')
+    right_arrow.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 点击向右切换
+    for ch in range(1, 8):
+        right_arrow.click()
+        time.sleep(5)
+        right_arrow = device_driver.xpath('//android.widget.Button[5]')
+
+    # 断言：按钮可点击，操作成功
+    assert right_arrow.wait(timeout=SLEEP_DEFAULT), "❌ 向右切换通道失败"
+
+    print("✅ 向右切换通道测试完成")
+
+# def test_recovery_default_freq(device_driver):
+#     """波形页面-恢复默认频率"""
+#     recovery_default_freq = device_driver.xpath('//android.widget.Button[5]')
+#     recovery_default_freq.wait(timeout=WAIT_TIMEOUT_NORMAL)
+#
+#
+#     recovery_default_freq.click()
+#     time.sleep(SLEEP_DEFAULT)
+#
+#     # 断言：按钮可点击，操作成功
+#     assert recovery_default_freq.wait(timeout=SLEEP_DEFAULT), "❌ 恢复默认频率测试fail"
+#
+#     print("✅ 恢复默认频率测试完成")
+
+def test_switch_pause_resume(device_driver):
+    """波形页面-暂停/开始"""
+    pause_resume = device_driver.xpath('//android.widget.Button[6]')
+    pause_resume.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 点击向右切换
+    for i in range(1,3):
+        pause_resume.click()
+        time.sleep(SLEEP_DEFAULT)
+
+    # 断言：按钮可点击，操作成功
+    assert pause_resume.wait(timeout=SLEEP_DEFAULT), "❌ 暂停开始测试fail"
+
+    print("✅ 暂停开启测试完成")
+
+def test_wave_zoom_in(device_driver):
+    """波形页面-缩小按钮"""
+    zoom_in_btn = device_driver.xpath('//android.widget.Button[@content-desc="缩小"]')
+
+    # 等待元素加载
+    zoom_in_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # 点击缩小按钮
+    zoom_in_btn.click()
+
+    time.sleep(SLEEP_DEFAULT)
+
+    zoom_out_btn = device_driver.xpath(
+        '//android.view.View[@scrollable="true"]'
+        '/android.view.View[1]'
+        '/android.view.View[2]'
+    )
+    # 断言按钮存在，操作成功
+    assert  zoom_out_btn.wait(timeout=SLEEP_DEFAULT), "❌ 回到缩小界面失败"
+
+    print("✅ 缩小按钮测试完成")
+
+
 def test_start_data_collection(device_driver):
     """开始数据采集"""
     swipe_to_bottom(device_driver)
 
     device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DATA_COLLECT_BDF).click()
-    time.sleep(SLEEP_DEFAULT)
+    time.sleep(WAIT_TIMEOUT_NORMAL)
 
     click_if_exists(device_driver, DESC_ALWAYS_ALLOW)
 
@@ -392,6 +640,17 @@ def run_all_test_cases(device_driver):
     test_connect_first_detected_device(device_driver)
     test_navigate_to_waveform(device_driver)
     test_filter_choose(device_driver)
+    test_switch_all_views(device_driver)
+    # 波形界面新增case
+    test_wave_zoom_out(device_driver)
+    test_wave_unit_switch(device_driver)
+    test_wave_voltage_setting(device_driver)
+    test_wave_duration_setting(device_driver)
+    test_wave_eeg_filter_setting(device_driver)
+    test_switch_channel_right(device_driver)
+    test_switch_pause_resume(device_driver)
+    test_wave_zoom_in(device_driver)
+
     test_start_data_collection(device_driver)
     test_stop_data_collection(device_driver)
     test_check_product_info(device_driver)

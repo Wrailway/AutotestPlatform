@@ -347,7 +347,7 @@ def test_switch_pause_resume(device_driver):
     # 断言：按钮可点击，操作成功
     assert pause_resume.wait(timeout=SLEEP_DEFAULT), "❌ 暂停开始测试fail"
 
-    print("✅ 向右切换通道测试完成")
+    print("✅ 暂停开启测试完成")
 
 def test_zoom_out(device_driver):
     """波形放大页面"""

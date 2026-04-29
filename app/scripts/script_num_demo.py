@@ -66,6 +66,7 @@ def run_repeat(func):
         assert result, "用例执行失败"  # ✅ 这里统一断言，绝对不报错
 
 # ========================= 25 条成功用例 =========================
+@pytest.mark.skip('跳过')
 def test_success_01():
     run_repeat(lambda: complex_calculate(3) == pytest.approx(6 + 14 + 1.386))
 

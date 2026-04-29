@@ -441,7 +441,7 @@ def test_start_data_collection(device_driver):
 
     device_driver(description=DESC_DATA_COLLECT_BDF).wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description=DESC_DATA_COLLECT_BDF).click()
-    time.sleep(SLEEP_DEFAULT)
+    time.sleep(WAIT_TIMEOUT_NORMAL)
 
     click_if_exists(device_driver, DESC_ALWAYS_ALLOW)
 
