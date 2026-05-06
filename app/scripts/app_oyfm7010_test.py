@@ -43,6 +43,7 @@ DESC_PREDEFINE_PARAMS = "预定义参数设置"
 
 DESC_VIEW_PRODUCT_INFO = "查看产品信息"
 DESC_ABOUT = "关于"
+DESC_ALLOW_WHEN_USING = "仅在使用中允许"
 
 
 # ====================== 全局控制 ======================
@@ -361,7 +362,85 @@ def test_zoom_out(device_driver):
     assert zoom_out_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到缩小按钮"
     zoom_out_btn.click()
     time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
     print("✅ 缩小按钮操作完成")
+
+def test_enter_lsl(device_driver):
+    """主界面-进入LSL"""
+    lsl_btn = device_driver(description="LSL")
+    lsl_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    lsl_btn.click()
+    click_if_exists(device_driver, DESC_ALLOW_WHEN_USING, timeout=WAIT_TIMEOUT_VERY_SHORT)
+    time.sleep(SLEEP_DEFAULT)
+    # 退出（按返回键）
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ LSL 界面进入/退出测试完成")
+
+
+def test_enter_passive_mode(device_driver):
+    """主界面-进入被动模式"""
+    passive_btn = device_driver(description="被动模式")
+    passive_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    passive_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 被动模式界面进入/退出测试完成")
+
+def test_enter_remote_mode(device_driver):
+    """主界面-进入遥控模式"""
+    remote_btn = device_driver(description="遥控模式")
+    remote_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    remote_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 遥控模式界面进入/退出测试完成")
+
+def test_enter_single_way(device_driver):
+    """主界面-进入单向助力"""
+    single_btn = device_driver(description="单向助力")
+    single_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    single_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 单向助力界面进入/退出测试完成")
+
+
+def test_enter_bi_way(device_driver):
+    """主界面-进入双向助力"""
+    bi_btn = device_driver(description="双向助力")
+    bi_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    bi_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 双向助力界面进入/退出测试完成")
+
+
+def test_enter_production_test(device_driver):
+    """主界面-进入生产测试"""
+    prod_btn = device_driver(description="生产测试")
+    prod_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    prod_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 生产测试界面进入/退出测试完成")
+
+
+def test_enter_settings(device_driver):
+    """主界面-进入设置"""
+    settings_btn = device_driver(description="设置")
+    settings_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    settings_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+    print("✅ 设置界面进入/退出测试完成")
 
 # ========================= 统一执行流程 =========================
 def run_all_test_cases(device_driver):
@@ -370,6 +449,24 @@ def run_all_test_cases(device_driver):
     test_search_device(device_driver)
     test_connect_device(device_driver)
     test_enter_waveform(device_driver)
+    # 波形子界面case
+    test_filter_choose(device_driver)
+    test_wave_unit_switch(device_driver)
+    test_wave_voltage_setting(device_driver)
+    test_wave_duration_setting(device_driver)
+    test_switch_channel_right(device_driver)
+    test_switch_pause_resume(device_driver)
+    test_zoom_in(device_driver)
+    test_zoom_out(device_driver)
+
+    #主界面其他case
+    test_enter_lsl(device_driver)
+    test_enter_passive_mode(device_driver)
+    test_enter_remote_mode(device_driver)
+    test_enter_single_way(device_driver)
+    test_enter_bi_way(device_driver)
+    test_enter_production_test(device_driver)
+    test_enter_settings(device_driver)
 
 # ========================= 压力测试 =========================
 @pytest.mark.skip('skip test_main_auto_run')
