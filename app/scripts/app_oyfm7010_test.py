@@ -341,7 +341,7 @@ def test_switch_channel_right(device_driver):
 def test_switch_pause_resume(device_driver):
     """波形页面-暂停/开始"""
     # 暂停按钮：根据XML，是Button[15]（index=14，content-desc="暂停"）
-    pause_resume = device_driver.xpath('//android.widget.Button[5]')
+    pause_resume = device_driver.xpath('//android.widget.Button[4]')
     pause_resume.wait(timeout=WAIT_TIMEOUT_NORMAL)
 
     # 点击暂停/恢复两次
@@ -358,7 +358,7 @@ def test_switch_pause_resume(device_driver):
 def test_zoom_out(device_driver):
     """波形页面-缩小按钮"""
     # 缩小按钮：根据XML，是Button[16]（index=15，content-desc="缩小"）
-    zoom_out_btn = device_driver.xpath('//android.widget.Button[6]')
+    zoom_out_btn = device_driver.xpath('//android.widget.Button[5]')
     assert zoom_out_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到缩小按钮"
     zoom_out_btn.click()
     time.sleep(SLEEP_DEFAULT)
