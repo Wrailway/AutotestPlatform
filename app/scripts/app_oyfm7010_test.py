@@ -385,9 +385,65 @@ def test_enter_passive_mode(device_driver):
     passive_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
     passive_btn.click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+    print("✅ 被动模式界面进入/退出测试完成")
+
+def test_passive_mode_all_time_slots(device_driver):
+    """被动模式-全档位循环测试：15m/30m/1h"""
+    # 定位三个时间档位 + 启动按钮
+    time_15m = device_driver.xpath('//android.widget.RadioButton[1]')
+    time_30m = device_driver.xpath('//android.widget.RadioButton[2]')
+    time_1h  = device_driver.xpath('//android.widget.RadioButton[3]')
+    start_btn = device_driver.xpath('//android.widget.Button[@content-desc="启动"]')
+    stop_btn = device_driver.xpath('//android.widget.Button[@content-desc="暂停"]')
+
+    # 等待元素加载
+    time_15m.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    start_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+
+    # ======================================
+    # 档位 1：15m → 启动10s → 暂停
+    # ======================================
+    time_15m.click()
+    time.sleep(1)
+    start_btn.click()  # 启动
+    print("✅ 15m 档位启动，运行10秒...")
+    time.sleep(10)
+    # stop_btn = device_driver.xpath('//android.widget.Button[@content-desc="暂停"]')
+    stop_btn.click()  # 暂停
+    time.sleep(2)
+
+    # ======================================
+    # 档位 2：30m → 启动10s → 暂停
+    # ======================================
+    time_30m.click()
+    time.sleep(1)
+    start_btn.click()
+    print("✅ 30m 档位启动，运行10秒...")
+    time.sleep(10)
+    stop_btn.click()  # 暂停
+    time.sleep(2)
+
+    # ======================================
+    # 档位 3：1h → 启动10s → 暂停
+    # ======================================
+    time_1h.click()
+    time.sleep(1)
+    start_btn.click()
+    print("✅ 1h 档位启动，运行10秒...")
+    time.sleep(10)
+    stop_btn.click()  # 暂停
+    time.sleep(2)
+
+    # ======================================
+    # 恢复默认：15m
+    # ======================================
+    time_15m.click()
+    time.sleep(1)
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-    print("✅ 被动模式界面进入/退出测试完成")
+    print("✅ 被动模式全档位（15m/30m/1h）循环测试完成！")
 
 def test_enter_remote_mode(device_driver):
     """主界面-进入遥控模式"""
@@ -462,6 +518,9 @@ def run_all_test_cases(device_driver):
     #主界面其他case
     test_enter_lsl(device_driver)
     test_enter_passive_mode(device_driver)
+    #被动模式case
+    test_passive_mode_all_time_slots(device_driver)
+
     test_enter_remote_mode(device_driver)
     test_enter_single_way(device_driver)
     test_enter_bi_way(device_driver)
