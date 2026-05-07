@@ -45,6 +45,10 @@ DESC_VIEW_PRODUCT_INFO = "查看产品信息"
 DESC_ABOUT = "关于"
 DESC_ALLOW_WHEN_USING = "仅在使用中允许"
 
+# ====================== 校验关键字 ======================
+DEVICE_ADDRESS = "设备地址"
+SOFTWARE_NAME = "软件名称"
+
 
 # ====================== 全局控制 ======================
 def check_test_stop_pause():
@@ -120,7 +124,7 @@ def test_connect_device(device_driver):
     device_driver(description=DESC_CONNECT).click()
     time.sleep(WAIT_TIMEOUT_SHORT)
     assert device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_LONG), "❌ 设备连接失败"
-
+#
 def test_enter_waveform(device_driver):
     """查看波形"""
     click_if_exists(device_driver, DESC_VIEW_WAVEFORM)
@@ -483,9 +487,40 @@ def test_enter_production_test(device_driver):
     prod_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
     prod_btn.click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+    print("✅ 生产测试界面进入/退出测试完成")
+
+
+def test_enter_aging_test(device_driver):
+    """主界面-进入老化测试"""
+    # 1. 进入老化测试页面
+    aging_btn = device_driver(description="老化测试")
+    aging_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    aging_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+
+    # 2. 找 启动 按钮
+    start_btn = device_driver.xpath('//android.widget.Button[@content-desc="启动"]')
+    start_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    start_btn.click()
+    time.sleep(WAIT_TIMEOUT_LONG)  # 运行中
+
+    # 3. 重新找 暂停 按钮（文字变了，必须重新定位）
+    stop_btn = device_driver.xpath('//android.widget.Button[@content-desc="暂停"]')
+    stop_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
+    stop_btn.click()
+    time.sleep(SLEEP_DEFAULT)
+
+    # 4. 返回生成测试界面
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-    print("✅ 生产测试界面进入/退出测试完成")
+
+    # 4. 返回主界面界面
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+
+    print("✅ 老化测试：启动 → 暂停 执行完成")
 
 
 def test_enter_settings(device_driver):
@@ -494,9 +529,41 @@ def test_enter_settings(device_driver):
     settings_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
     settings_btn.click()
     time.sleep(SLEEP_DEFAULT)
+    # device_driver.press("back")
+    # time.sleep(SLEEP_DEFAULT)
+    print("✅ 设置界面进入/退出测试完成")
+
+
+def test_check_product_info(device_driver):
+    """查看产品信息"""
+    device_driver(description=DESC_VIEW_PRODUCT_INFO).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_VIEW_PRODUCT_INFO).click()
+    time.sleep(SLEEP_DEFAULT)
+
+    assert device_driver(descriptionContains=DEVICE_ADDRESS).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入产品信息页面"
+
     device_driver.press("back")
     time.sleep(SLEEP_DEFAULT)
-    print("✅ 设置界面进入/退出测试完成")
+    # is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    # assert is_back_ok, "❌ 返回设备页面失败"
+
+def test_enter_about_page(device_driver):
+    """进入关于页面"""
+    device_driver(description=DESC_ABOUT).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    device_driver(description=DESC_ABOUT).click()
+    time.sleep(SLEEP_DEFAULT)
+
+    assert device_driver(descriptionContains=SOFTWARE_NAME).wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未进入关于页面"
+    time.sleep(SLEEP_DEFAULT)
+
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+
+    device_driver.press("back")
+    time.sleep(SLEEP_DEFAULT)
+
+    is_back_ok = device_driver(description=DESC_READY).wait(timeout=WAIT_TIMEOUT_NORMAL)
+    assert is_back_ok, "❌ 返回设备页面失败"
 
 # ========================= 统一执行流程 =========================
 def run_all_test_cases(device_driver):
@@ -525,7 +592,13 @@ def run_all_test_cases(device_driver):
     test_enter_single_way(device_driver)
     test_enter_bi_way(device_driver)
     test_enter_production_test(device_driver)
+
+    test_enter_aging_test(device_driver)
+
     test_enter_settings(device_driver)
+    test_check_product_info(device_driver)
+    test_enter_about_page(device_driver)
+
 
 # ========================= 压力测试 =========================
 @pytest.mark.skip('skip test_main_auto_run')
