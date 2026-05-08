@@ -204,49 +204,53 @@ def test_filter_choose(device_driver):
 
     print("✅ 所有滤波开关操作测试通过")
 
-@pytest.mark.skip('放大倍数还存在小bug，先跳过')
 def test_gain(device_driver):
     """设置放大倍数：随机选择3个"""
-    # 定位右上角放大倍数按钮
-    gain_btn = device_driver.xpath('//*[@content-desc="查看波形"]/following-sibling::android.view.View[1]')
-    assert gain_btn.wait(timeout=WAIT_TIMEOUT_NORMAL), "❌ 未找到右上角设置按钮"
-
-    # 放大倍数列表
     gain_list = ["2", "3", "4", "6", "8", "12"]
-
-    # 随机选 3 个
     selected = random.sample(gain_list, 3)
 
-    # 循环选择
+    # 第一次设置
     for val in selected:
-        # 每次都重新打开菜单（必须）
+        # 每次都重新获取按钮
+        gain_btn = device_driver.xpath('//*[@content-desc="查看波形"]/following-sibling::android.view.View[1]')
+        gain_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
         gain_btn.click()
-        time.sleep(SLEEP_DEFAULT)
+        time.sleep(0.6)
 
+        # 选择放大倍数
+        device_driver(description=val).wait(timeout=WAIT_TIMEOUT_NORMAL)
+        device_driver(description=val).click()
+        time.sleep(0.8)
+
+        # 关闭确定弹窗（每次都重新查找）
         try:
-            # 等待任意按钮出现并点击
-            btn = device_driver.xpath('//android.widget.Button').wait(timeout=5)
-            if btn:
-                device_driver.xpath('//android.widget.Button').click()
-                time.sleep(SLEEP_DEFAULT)
+            confirm = device_driver(description="确定", clickable=True)
+            confirm.wait(timeout=2)
+            confirm.click()
+            time.sleep(0.5)
         except:
             pass
 
-        # 等待选项出现 → 点击
-        device_driver(description=val).wait(timeout=WAIT_TIMEOUT_NORMAL)
-        device_driver(description=val).click()
-        time.sleep(SLEEP_DEFAULT)
-
-        print(f"✅ 已选择放大倍数：{val}")
+        time.sleep(0.5)
 
     # 恢复默认 1
+    gain_btn = device_driver.xpath('//*[@content-desc="查看波形"]/following-sibling::android.view.View[1]')
+    gain_btn.wait(timeout=WAIT_TIMEOUT_NORMAL)
     gain_btn.click()
-    time.sleep(SLEEP_DEFAULT)
+    time.sleep(0.6)
+
     device_driver(description="1").wait(timeout=WAIT_TIMEOUT_NORMAL)
     device_driver(description="1").click()
-    time.sleep(SLEEP_DEFAULT)
+    time.sleep(0.8)
 
-    print("✅ 放大倍数测试完成：随机3个 → 恢复默认1")
+    try:
+        confirm = device_driver(description="确定", clickable=True)
+        confirm.wait(timeout=2)
+        confirm.click()
+    except:
+        pass
+
+    print("✅ 放大倍数测试完成")
 
 
 def test_zoom_in(device_driver):
@@ -563,13 +567,14 @@ def run_all_test_cases(device_driver):
     test_enter_waveform(device_driver)
     # 波形子界面case
     test_filter_choose(device_driver)
-
+    test_gain(device_driver)
+    test_zoom_in(device_driver)
     test_wave_duration_setting(device_driver)
     test_wave_voltage_setting(device_driver)
     test_wave_unit_switch(device_driver)
     test_switch_channel_right(device_driver)
     test_switch_pause_resume(device_driver)
-    test_zoom_in(device_driver)
+
     test_zoom_out(device_driver)
 
     #主界面其他case
