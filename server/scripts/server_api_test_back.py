@@ -2,8 +2,6 @@ import pytest
 import requests
 import time
 import json
-import uuid
-from datetime import datetime
 
 from server.server_common import OperateSharedData
 
@@ -91,29 +89,29 @@ URL_SYS_PHONE_LOGIN = "/sys/phoneLogin"
 URL_SYS_RANDOM_IMAGE = "/sys/randomImage/{key}"
 URL_SYS_SCAN_LOGIN_QRCODE = "/sys/scanLoginQrcode"
 
-# ====================== 【动态测试数据 - 自动生成，永不重复】 ======================
-TEST_TEMPLATE_NO = 9999
-TEST_TRAINING_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-TEST_UUID = f"AUTO_{uuid.uuid4().hex[:12].upper()}"
+# ====================== 测试参数常量 ======================
+TEST_TEMPLATE_NO = 999
+TEST_TRAINING_TIME = "2025-01-01 00:00:00"
+TEST_UUID = "AUTO_TEST_DEVICE_001"
 TEST_PAGE_NO = 1
 TEST_CURRENT_FIRMWARE_VERSION = "V1.0.0"
-TEST_TEMPLATE_ID = 9999
-TEST_TEMPLATE_NAME = f"test_template_{uuid.uuid4().hex[:6]}"
-TEST_TEMPLATE_DESCRIPTION = "模板测试描述_自动生成"
+TEST_TEMPLATE_ID = 999
+TEST_TEMPLATE_NAME = "test_template_001"
+TEST_TEMPLATE_DESCRIPTION = "模板测试描述"
 TEST_ADDR = "127.0.0.1"
-TEST_ACTIVATE_KEY = f"activate_{uuid.uuid4().hex[:8]}"
-TEST_EMG_MODEL_ID = 9999
-TEST_DEBUG_INFO = f"test_debug_{uuid.uuid4().hex[:8]}"
-TEST_QRCODE_ID = f"test_qrcode_{uuid.uuid4().hex[:6]}"
-TEST_LOGIN_TOKEN = f"test_token_{uuid.uuid4().hex[:10]}"
-TEST_CAPTCHA_KEY = f"test_key_{uuid.uuid4().hex[:6]}"
+TEST_ACTIVATE_KEY = "activate-key-001"
+TEST_EMG_MODEL_ID = 999
+TEST_DEBUG_INFO = "test_debug_info_2025"
+TEST_QRCODE_ID = "test_qrcode_123"
+TEST_LOGIN_TOKEN = "test_token_123"
+TEST_CAPTCHA_KEY = "test_key_123"
 
 TEST_DEVICE_NAME = "OYFM7000"
 TEST_FILE_PATH = "/test/test.apk"
 TEST_VERSION = "V1.0.0"
 TEST_CHANNEL = "test_channel"
-TEST_ID = "9999"
-TEST_IDS = "9999"
+TEST_ID = "999"
+TEST_IDS = "999"
 TEST_GET_TYPE_NAME = "test_type"
 TEST_FIRMWARE_URL = "test_url"
 
@@ -154,61 +152,94 @@ def print_response_info(req_params, res):
     resp_text = res.text.strip()
 
     try:
+        # JSON 格式
         resp_json = res.json()
         print(f"返回JSON: {resp_json}")
     except:
+        # 字符串 / 文件 / 二进制
         if resp_text:
             print(f"返回内容: {resp_text}")
         else:
             print("返回内容: 空")
-    print("======================================\n")
 
+    print("======================================\n")
 
 def assert_api_common(res):
     """
     【终极版】适配你所有接口的断言规则
     支持：标准JSON、老接口JSON、文件流、字符串、空返回
+
+    规则：
+    1. HTTP 状态码 != 200 → 直接 FAIL（服务异常）
+    2. 标准JSON：
+       - success: false → FAIL
+       - success: true  → PASS
+    3. 老接口JSON（无success）：
+       - msg 包含失败关键词 → FAIL
+       - res = session_ → FAIL
+    4. 文件/二进制返回 → 直接 PASS（下载接口正常）
+    5. 字符串/空返回 → 直接 PASS
     """
+    # ======================
+    # 1. 基础：HTTP 必须 200
+    # ======================
     assert res.status_code == 200, f"❌ 服务异常 | HTTP状态码: {res.status_code}"
+
     resp_text = res.text.strip()
+
+    # 空内容直接通过（字符串接口/空接口）
     if not resp_text:
         return
 
     try:
+        # ======================
+        # 2. 尝试解析 JSON
+        # ======================
         resp = res.json()
+
+        # ----------------------
+        # 【规则A】标准结构：有 success 字段
+        # ----------------------
         if "success" in resp:
             success = resp.get("success")
+            code = resp.get("code")
             msg = resp.get("message", "无描述")
-            assert success is True, f"❌ 业务失败 | message={msg}"
+
+            # success = false → 强制失败
+            assert success is True, f"❌ 业务失败 | code={code} | message={msg}"
+
+        # ----------------------
+        # 【规则B】老接口：无 success，但有 msg/res
+        # ----------------------
         else:
             msg = str(resp.get("msg", "")).strip()
-            fail_keywords = ["未知", "失败", "错误", "无效", "异常", "不存在", "未找到", "未登录", "过期", "非法"]
+            res_code = str(resp.get("res", "")).strip()
+
+            # 失败关键词（可自行扩展）
+            fail_keywords = [
+                "未知", "失败", "错误", "无效", "异常",
+                "不存在", "未找到", "未登录", "过期", "非法"
+            ]
+
+            # 命中关键词 → 失败
             for keyword in fail_keywords:
                 if keyword in msg:
                     assert False, f"❌ 接口失败 | msg={msg}"
+
+            # 特殊失败码 → 失败
+            if res_code == "session_":
+                assert False, f"❌ 会话无效 | msg={msg}"
+
+    # ======================
+    # 3. 非 JSON（字符串/文件）→ 直接通过
+    # ======================
     except json.JSONDecodeError:
         return
-
-
-def safe_request(session, method, url, **kwargs):
-    """统一异常安全请求：文件不存在/超时/异常 → 不中断用例"""
-    try:
-        if method.lower() == "get":
-            return session.get(url, timeout=10, **kwargs)
-        elif method.lower() == "post":
-            return session.post(url, timeout=10, **kwargs)
-        elif method.lower() == "put":
-            return session.put(url, timeout=10, **kwargs)
-        elif method.lower() == "delete":
-            return session.delete(url, timeout=10, **kwargs)
-    except Exception as e:
-        pytest.skip(f"⚠️ 请求异常，自动跳过：{str(e)}")
-
 
 # ====================== 测试夹具 ======================
 @pytest.fixture(scope="session", autouse=True)
 def device_driver():
-    print("\n✅ 测试会话开始 - 优化版接口测试")
+    print("\n✅ 测试会话开始 - 真实接口测试")
     yield
     print("\n✅ 测试会话结束")
 
@@ -229,7 +260,7 @@ def api_session():
     session.close()
 
 
-# ====================== ✅ 【业务流程顺序 - 零失败】测试用例 ======================
+# ====================== ✅ 【已按业务关联 + 流程顺序 排序】测试用例 ======================
 
 # ==========================================
 # 1. 系统基础 & 登录
@@ -238,21 +269,21 @@ def test_sys_login(api_session):
     """【用户登录】账号密码登录"""
     url = f"{BASE_URL}{URL_SYS_LOGIN}"
     json_data = {"username": "test", "password": "test123", "captcha": "1234", "checkKey": TEST_CAPTCHA_KEY}
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
 def test_backstage_page(api_session):
     """【主页】展示首页数据"""
     url = f"{BASE_URL}{URL_BACKSTAGE_PAGE}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
 def test_default_settings(api_session):
     """【默认设置】根据设备类型获取设备默认设置"""
     url = f"{BASE_URL}{URL_DEFAULT_SETTINGS}".format(deviceName=TEST_DEVICE_NAME)
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info({"deviceName": TEST_DEVICE_NAME}, res)
     assert_api_common(res)
 
@@ -266,7 +297,7 @@ def test_user_signup(api_session):
         "activate_key": TEST_ACTIVATE_KEY, "addr": TEST_ADDR, "city": "上海", "email": "test@demo.com",
         "location": "上海测试点位", "name": "测试人员", "phone_number": "13800138000", "uuid": TEST_UUID
     }
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -274,7 +305,7 @@ def test_user_signin(api_session):
     """【设备用户】查询设备是否存在"""
     url = f"{BASE_URL}{URL_USER_SIGNIN}"
     params = {"addr": TEST_ADDR, "uuid": TEST_UUID}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -282,7 +313,7 @@ def test_user_device_info(api_session):
     """【设备用户】获取产品信息"""
     url = f"{BASE_URL}{URL_USER_DEVICE_INFO}"
     params = {"uuid": TEST_UUID}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -290,7 +321,7 @@ def test_user_user_info(api_session):
     """【设备用户】通过id查询用户信息"""
     url = f"{BASE_URL}{URL_USER_USER_INFO}"
     params = {"activate_key": TEST_ACTIVATE_KEY, "addr": TEST_ADDR}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -300,7 +331,7 @@ def test_user_user_info(api_session):
 def test_user_get_templates(api_session):
     """【设备用户】获取所有模板信息"""
     url = f"{BASE_URL}{URL_USER_GET_TEMPLATES}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -311,7 +342,7 @@ def test_user_gesture_train(api_session):
         "channel": 1, "channelNUm": 8, "gesture_count": 5, "restart": 0, "sample_rate": 1000,
         "template_description": TEST_TEMPLATE_DESCRIPTION, "template_name": TEST_TEMPLATE_NAME, "template_no": TEST_TEMPLATE_NO
     }
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -319,7 +350,7 @@ def test_user_single_train(api_session):
     """【设备用户】单机手势训练"""
     url = f"{BASE_URL}{URL_USER_SINGLE_TRAIN}"
     params = {"addr": TEST_ADDR, "channel": 1, "channelNum": 8, "gestureCount": 5, "restart": 0, "sampleRate": 1000, "templateNo": TEST_TEMPLATE_NO}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -327,14 +358,14 @@ def test_user_retrain(api_session):
     """【设备用户】重新训练"""
     url = f"{BASE_URL}{URL_USER_RETRAIN}"
     params = {"template_no": TEST_TEMPLATE_NO, "training_time": TEST_TRAINING_TIME}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_user_get_training_status(api_session):
     """【设备用户】查看单机手势状态"""
     url = f"{BASE_URL}{URL_USER_GET_TRAINING_STATUS}"
-    res = safe_request(api_session, "post", url, params={})
+    res = api_session.post(url, params={}, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -342,7 +373,7 @@ def test_user_modify_template_info(api_session):
     """【设备用户】修改模板信息"""
     url = f"{BASE_URL}{URL_USER_MODIFY_TEMPLATE_INFO}"
     params = {"template_description": TEST_TEMPLATE_DESCRIPTION, "template_id": TEST_TEMPLATE_ID, "template_name": TEST_TEMPLATE_NAME}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -353,7 +384,7 @@ def test_user_get_training_records(api_session):
     """【设备用户】获取训练记录"""
     url = f"{BASE_URL}{URL_USER_GET_TRAINING_RECORDS}"
     params = {"page_no": TEST_PAGE_NO, "template_no": TEST_TEMPLATE_NO}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -361,7 +392,7 @@ def test_user_download_emg_data(api_session):
     """【设备用户】下载训练数据"""
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_DATA}"
     params = {"template_no": TEST_TEMPLATE_NO}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -371,7 +402,7 @@ def test_user_download_emg_data(api_session):
 def test_user_check_latest_emg_models(api_session):
     """【设备用户】检查有无训练完成的模型"""
     url = f"{BASE_URL}{URL_USER_CHECK_LATEST_EMG_MODELS}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -379,14 +410,14 @@ def test_user_add_model_status(api_session):
     """【设备用户】新增模型应用状态"""
     url = f"{BASE_URL}{URL_USER_ADD_MODEL_STATUS}"
     params = {"template_no": TEST_TEMPLATE_NO, "training_time": TEST_TRAINING_TIME}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_user_get_model_status(api_session):
     """【设备用户】查看当前模型应用"""
     url = f"{BASE_URL}{URL_USER_GET_MODEL_STATUS}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -394,7 +425,7 @@ def test_user_download_emg_model(api_session):
     """【设备用户】应用EMG模型"""
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_MODEL}"
     params = {"template_no": TEST_TEMPLATE_NO, "training_time": TEST_TRAINING_TIME}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -408,14 +439,14 @@ def test_user_save_device_settings(api_session):
         "cali_data": "", "ctrl_setting": "", "pid_setting": "",
         "record_id": 0, "record_name": "test_settings_001", "sensor_type": 1, "threshold_setting": ""
     }
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_user_get_device_settings(api_session):
     """【设备用户】获取设备设置记录"""
     url = f"{BASE_URL}{URL_USER_GET_DEVICE_SETTINGS}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -426,14 +457,14 @@ def test_user_latest_firmware_version(api_session):
     """【设备用户】获取控制板最新固件版本"""
     url = f"{BASE_URL}{URL_USER_LATEST_FIRMWARE_VERSION}"
     params = {"current_firmware_version": TEST_CURRENT_FIRMWARE_VERSION}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_firmware_download(api_session):
     """【下载最新固件】下载最新固件"""
     url = f"{BASE_URL}{URL_FIRMWARE_DOWNLOAD}".format(getTypeName=TEST_GET_TYPE_NAME, url=TEST_FIRMWARE_URL)
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info({"getTypeName": TEST_GET_TYPE_NAME, "url": TEST_FIRMWARE_URL}, res)
     assert_api_common(res)
 
@@ -444,7 +475,7 @@ def test_user_debug_info(api_session):
     """【设备用户】上传调试信息"""
     url = f"{BASE_URL}{URL_USER_DEBUG_INFO}"
     params = {"debug_info": TEST_DEBUG_INFO}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -456,7 +487,7 @@ def test_user_usage_stat(api_session):
         "total_open_times_1": 10, "total_open_times_2": 20, "total_open_times_3": 30,
         "total_open_times_4": 40, "total_open_times_5": 50, "total_use_time": 1200
     }
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -467,21 +498,21 @@ def test_apk_latest_version(api_session):
     """【APK下载】获取APP最新版本"""
     url = f"{BASE_URL}{URL_APK_LATEST_VERSION}"
     params = {"channel": TEST_CHANNEL}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_apk_download_latest(api_session):
     """【APK下载】下载APP最新版本"""
     url = f"{BASE_URL}{URL_APK_DOWNLOAD_LATEST}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
 def test_apk_download_version(api_session):
     """【APK下载】下载指定版本APP"""
     url = f"{BASE_URL}{URL_APK_DOWNLOAD_VERSION}".format(version=TEST_VERSION)
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info({"version": TEST_VERSION}, res)
     assert_api_common(res)
 
@@ -495,7 +526,7 @@ def test_apk_version_add(api_session):
         "appId": "test_app_id", "channel": 1, "creator": "test", "filePath": "/test/test.apk",
         "releaseNoteEn": "test", "releaseNoteZh": "测试", "status": 1, "version": "1.0.0", "versionName": "V1.0.0"
     }
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -503,7 +534,7 @@ def test_apk_version_list(api_session):
     """【APK版本发布】分页查询APK版本"""
     url = f"{BASE_URL}{URL_APK_VERSION_LIST}"
     params = {"pageNo": 1, "pageSize": 10}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -511,7 +542,7 @@ def test_apk_version_query_by_id(api_session):
     """【APK版本发布】根据ID查询APK版本"""
     url = f"{BASE_URL}{URL_APK_VERSION_QUERY_BY_ID}"
     params = {"id": TEST_ID}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -522,7 +553,7 @@ def test_apk_version_edit_post(api_session):
         "id": 1, "appId": "test_app_id", "channel": 1, "creator": "test", "filePath": "/test/test.apk",
         "releaseNoteEn": "test", "releaseNoteZh": "测试", "status": 1, "version": "1.0.0", "versionName": "V1.0.0"
     }
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -533,7 +564,7 @@ def test_apk_version_edit_put(api_session):
         "id": 1, "appId": "test_app_id", "channel": 1, "creator": "test", "filePath": "/test/test.apk",
         "releaseNoteEn": "test", "releaseNoteZh": "测试", "status": 1, "version": "1.0.0", "versionName": "V1.0.0"
     }
-    res = safe_request(api_session, "put", url, json=json_data)
+    res = api_session.put(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -547,7 +578,7 @@ def test_usage_stats_add(api_session):
         "addr": TEST_ADDR, "latitude": 31.230416, "longitude": 121.473701,
         "totalOpenTimes1": 10, "totalOpenTimes2": 20, "totalUseTime": 1200
     }
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -555,7 +586,7 @@ def test_usage_stats_list(api_session):
     """【上传使用数据】分页查询上传使用数据"""
     url = f"{BASE_URL}{URL_USAGE_STATS_LIST}"
     params = {"pageNo": 1, "pageSize": 10}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -563,7 +594,7 @@ def test_usage_stats_query_by_id(api_session):
     """【上传使用数据】根据ID查询上传使用数据"""
     url = f"{BASE_URL}{URL_USAGE_STATS_QUERY_BY_ID}"
     params = {"id": TEST_ID}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -574,7 +605,7 @@ def test_usage_stats_edit_post(api_session):
         "id": 1, "addr": TEST_ADDR, "latitude": 31.230416, "longitude": 121.473701,
         "totalOpenTimes1": 10, "totalOpenTimes2": 20, "totalUseTime": 1200
     }
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -585,7 +616,7 @@ def test_usage_stats_edit_put(api_session):
         "id": 1, "addr": TEST_ADDR, "latitude": 31.230416, "longitude": 121.473701,
         "totalOpenTimes1": 10, "totalOpenTimes2": 20, "totalUseTime": 1200
     }
-    res = safe_request(api_session, "put", url, json=json_data)
+    res = api_session.put(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -604,13 +635,13 @@ def test_apk_upload_file(api_session):
     assert_api_common(res)
 
 # ==========================================
-# 13. 最后执行：删除类接口（安全、不影响流程）
+# 13. 最后执行：删除类接口（不影响前置流程）
 # ==========================================
 def test_user_delete_error_training_info(api_session):
     """【设备用户】删除训练出错信息"""
     url = f"{BASE_URL}{URL_USER_DELETE_ERROR_TRAINING_INFO}"
     params = {"emg_model_id": TEST_EMG_MODEL_ID}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -618,7 +649,7 @@ def test_user_delete_training_record(api_session):
     """【设备用户】删除训练记录"""
     url = f"{BASE_URL}{URL_USER_DELETE_TRAINING_RECORD}"
     params = {"template_no": TEST_TEMPLATE_NO, "training_time": TEST_TRAINING_TIME}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -626,7 +657,7 @@ def test_apk_delete_file(api_session):
     """【APK文件上传】删除APK文件"""
     url = f"{BASE_URL}{URL_APK_DELETE_FILE}"
     params = {"filePath": TEST_FILE_PATH}
-    res = safe_request(api_session, "delete", url, params=params)
+    res = api_session.delete(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -634,7 +665,7 @@ def test_apk_version_delete(api_session):
     """【APK版本发布】删除APK版本"""
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE}"
     params = {"id": TEST_ID}
-    res = safe_request(api_session, "delete", url, params=params)
+    res = api_session.delete(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -642,7 +673,7 @@ def test_apk_version_delete_batch(api_session):
     """【APK版本发布】批量删除APK版本"""
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE_BATCH}"
     params = {"ids": TEST_IDS}
-    res = safe_request(api_session, "delete", url, params=params)
+    res = api_session.delete(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -650,7 +681,7 @@ def test_usage_stats_delete(api_session):
     """【上传使用数据】删除上传使用数据"""
     url = f"{BASE_URL}{URL_USAGE_STATS_DELETE}"
     params = {"id": TEST_ID}
-    res = safe_request(api_session, "delete", url, params=params)
+    res = api_session.delete(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -658,7 +689,7 @@ def test_usage_stats_delete_batch(api_session):
     """【上传使用数据】批量删除上传使用数据"""
     url = f"{BASE_URL}{URL_USAGE_STATS_DELETE_BATCH}"
     params = {"ids": TEST_IDS}
-    res = safe_request(api_session, "delete", url, params=params)
+    res = api_session.delete(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -669,7 +700,7 @@ def test_usage_stats_delete_batch(api_session):
 def test_sys_get_login_qrcode(api_session):
     """【用户登录】获取登录二维码"""
     url = f"{BASE_URL}{URL_SYS_GET_LOGIN_QRCODE}"
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info(None, res)
     assert_api_common(res)
 
@@ -678,7 +709,7 @@ def test_sys_get_qrcode_token(api_session):
     """【用户登录】获取扫码token"""
     url = f"{BASE_URL}{URL_SYS_GET_QRCODE_TOKEN}"
     params = {"qrcodeId": TEST_QRCODE_ID}
-    res = safe_request(api_session, "get", url, params=params)
+    res = api_session.get(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
 
@@ -687,7 +718,7 @@ def test_sys_phone_login(api_session):
     """【用户登录】手机号登录"""
     url = f"{BASE_URL}{URL_SYS_PHONE_LOGIN}"
     json_data = {"phone": "13800138000", "code": "1234"}
-    res = safe_request(api_session, "post", url, json=json_data)
+    res = api_session.post(url, json=json_data, timeout=10)
     print_response_info(json_data, res)
     assert_api_common(res)
 
@@ -695,7 +726,7 @@ def test_sys_phone_login(api_session):
 def test_sys_random_image(api_session):
     """【用户登录】获取验证码图片"""
     url = f"{BASE_URL}{URL_SYS_RANDOM_IMAGE}".format(key=TEST_CAPTCHA_KEY)
-    res = safe_request(api_session, "get", url)
+    res = api_session.get(url, timeout=10)
     print_response_info({"key": TEST_CAPTCHA_KEY}, res)
     assert_api_common(res)
 
@@ -704,6 +735,6 @@ def test_sys_scan_login_qrcode(api_session):
     """【用户登录】扫码登录二维码"""
     url = f"{BASE_URL}{URL_SYS_SCAN_LOGIN_QRCODE}"
     params = {"qrcodeId": TEST_QRCODE_ID, "token": TEST_LOGIN_TOKEN}
-    res = safe_request(api_session, "post", url, params=params)
+    res = api_session.post(url, params=params, timeout=10)
     print_response_info(params, res)
     assert_api_common(res)
