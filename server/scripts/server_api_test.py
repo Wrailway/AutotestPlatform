@@ -161,17 +161,32 @@ def refresh_test_params():
     except Exception:
         pass
 
+
 def print_response_info(req_params, res):
-    print("\n" + "="*50)
+    """干净版：不打印二进制乱码，自动识别文件/图片/APK"""
+    print("\n" + "=" * 50)
+
+    # 打印请求参数
     if req_params:
         print(f"请求参数: {req_params}")
-    print(f"状态码: {res.status_code}")
-    try:
-        print(f"响应: {json.dumps(res.json(), ensure_ascii=False, indent=2)}")
-    except:
-        print(f"响应: {res.text}")
-    print("="*50)
 
+    # 打印状态码
+    print(f"状态码: {res.status_code}")
+
+    try:
+        # 如果是 JSON → 正常打印
+        if "application/json" in res.headers.get("Content-Type", ""):
+            print(f"响应内容: {json.dumps(res.json(), ensure_ascii=False, indent=2)}")
+        else:
+            # 如果是图片/APK/文件 → 不打印乱码，只提示
+            content_type = res.headers.get("Content-Type", "unknown")
+            print(f"响应内容: 【文件/图片/APK 二进制流】 Content-Type: {content_type}，长度：{len(res.content)} 字节")
+
+    except Exception:
+        # 其他非JSON、非文件 → 安全输出
+        print("响应内容: 非JSON格式数据（已屏蔽乱码）")
+
+    print("=" * 50)
 def assert_api_common(res):
     assert res.status_code == 200, f"HTTP状态码异常: {res.status_code}"
     try:
