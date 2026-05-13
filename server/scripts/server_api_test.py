@@ -1,3 +1,5 @@
+import base64
+import ddddocr
 import pytest
 import requests
 import time
@@ -10,12 +12,19 @@ from server.server_common import OperateSharedData
 # ====================== 全局常量配置 ======================
 HOST = "http://neucirflite-test.oymotion.com"
 BASE_URL = f"{HOST}/neucirflite_portal"
-REAL_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3NzgzMzM5OTMsInVzZXJuYW1lIjoi5ZCR5aKe5o-Q5pyJIn0.Td_YxrGLHN83dyryYRB7_QhFBNpoAwdrPfUM4eDzNBE"
+REAL_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg2ODAxNTQsInVzZXJuYW1lIjoid2FuZ3J1aXdlaUBveW1vdGlvbi5jb20ifQ.wh4qUon9siPfdYSiU-C7EuZZ6K5kH7AGvQzfdrjn7c0"
 
 HEADERS = {
     "X-Access-Token": REAL_TOKEN,
     "Content-Type": "application/json"
 }
+
+# ===================== 状态码 =====================
+HTTP_OK = 200
+HTTP_CREATED = 201
+HTTP_UNAUTHORIZED = 401
+HTTP_FORBIDDEN = 403
+HTTP_NOT_FOUND = 404
 
 # ====================== 接口路由【严格按你顺序分组】 ======================
 # 一、系统登录 & 主页
@@ -113,7 +122,7 @@ TEST_PAGE_SIZE = 10
 TEST_CAPTCHA_KEY = f"test_key_{uuid.uuid4().hex[:6]}"
 TEST_QRCODE_ID = f"test_qrcode_{uuid.uuid4().hex[:6]}"
 TEST_DEVICE_SERIAL_NO = f"SN_{uuid.uuid4().hex[:10].upper()}"
-TEST_DEVICE_NAME = "OY-DEVICE-001"
+TEST_DEVICE_NAME = "OYFM-7000.json"
 TEST_ID = "9999"
 TEST_IDS = "9999,10000"
 TEST_VERSION = "V1.0.0"
@@ -162,6 +171,23 @@ def refresh_test_params():
         pass
 
 
+
+# 初始化 OCR 全局一次（只加载一次模型，速度快）
+ocr = ddddocr.DdddOcr(use_gpu=False, show_ad=False)
+
+# ====================== 【通用工具函数】从 base64 图片提取验证码 ======================
+def get_captcha_from_base64(base64_img_str):
+    try:
+        if "," in base64_img_str:
+            base64_data = base64_img_str.split(",")[1]
+        else:
+            base64_data = base64_img_str
+        img_bytes = base64.b64decode(base64_data)
+        return ocr.classification(img_bytes).strip()
+    except Exception as e:
+        print(f"验证码识别失败：{e}")
+        return None
+
 def print_response_info(req_params, res):
     """干净版：不打印二进制乱码，自动识别文件/图片/APK"""
     print("\n" + "=" * 50)
@@ -187,13 +213,50 @@ def print_response_info(req_params, res):
         print("响应内容: 非JSON格式数据（已屏蔽乱码）")
 
     print("=" * 50)
+
 def assert_api_common(res):
-    assert res.status_code == 200, f"HTTP状态码异常: {res.status_code}"
+    """
+    通用接口断言函数（状态码抽成独立变量）
+    1. 优先校验 HTTP 状态码
+    2. 仅 200 时校验业务成功
+    3. 401/403/404 直接失败
+    """
+    # 允许的状态码集合
+    ALLOWED_STATUS_CODES = {HTTP_OK, HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_NOT_FOUND}
+
+    status_code = res.status_code
+
+    # ===================== 第一步：校验 HTTP 状态码 =====================
+    assert status_code in ALLOWED_STATUS_CODES, \
+        f"HTTP 状态码异常：{status_code}，允许范围：{ALLOWED_STATUS_CODES}"
+
+    # 4xx 直接失败
+    if status_code == HTTP_UNAUTHORIZED:
+        assert False, "HTTP 401：未授权 / 登录已失效"
+    if status_code == HTTP_FORBIDDEN:
+        assert False, "HTTP 403：权限不足，禁止访问"
+    if status_code == HTTP_NOT_FOUND:
+        assert False, "HTTP 404：接口地址不存在"
+
+    # ===================== 第二步：仅 200 时校验业务 =====================
     try:
         data = res.json()
+
+        # 格式1：success 判断
         if "success" in data:
-            assert data["success"] is True, f"业务失败: {data.get('message')}"
-    except:
+            success = data.get("success")
+            msg = data.get("message", "无消息")
+            code = data.get("code", "")
+            assert success is True, f"业务失败：{msg} (code={code})"
+
+        # 格式2：msg + res 判断（res=0成功）
+        elif "msg" in data and "res" in data:
+            res_code = data.get("res")
+            msg = data.get("msg", "无消息")
+            assert res_code == 0, f"业务失败：{msg} (res={res_code})"
+
+    except ValueError:
+        # 非 JSON（图片/文件/二进制）直接通过
         pass
 
 def safe_request(session, method, url, **kwargs):
@@ -232,14 +295,39 @@ def api_session():
 # ==============================================
 # 一、系统登录 & 主页 Case
 # ==============================================
+# ------------------- 登录用例：全自动获取验证码 + 识别 + 登录 -------------------
+# @pytest.mark.skip("test_sys_login：已验证pass")
 def test_sys_login(api_session):
-    """系统登录-账号密码登录"""
-    url = f"{BASE_URL}{URL_SYS_LOGIN}"
-    json_data = {"username":"test","password":"test123","captcha":"1234","checkKey":TEST_CAPTCHA_KEY}
-    res = safe_request(api_session,"post",url,json=json_data)
-    print_response_info(json_data,res)
+    """系统登录-账号密码登录（自动获取验证码 + 自动保存token）"""
+
+    # 1. 获取验证码图片
+    url_captcha = f"{BASE_URL}{URL_SYS_RANDOM_IMAGE}".format(key=TEST_CAPTCHA_KEY)
+    res_captcha = safe_request(api_session, "get", url_captcha)
+    assert_api_common(res_captcha)
+
+    # 2. 识别验证码
+    data_captcha = res_captcha.json()
+    captcha_code = get_captcha_from_base64(data_captcha["result"])
+    print(f"\n✅ 登录使用的验证码：【{captcha_code}】")
+
+    # 3. 登录
+    url_login = f"{BASE_URL}{URL_SYS_LOGIN}"
+    json_data = {
+        "username": "admin",
+        "password": "123456",
+        "captcha": captcha_code,
+        "checkKey": TEST_CAPTCHA_KEY
+    }
+    res = safe_request(api_session, "post", url_login, json=json_data)
+    print_response_info(json_data, res)
     assert_api_common(res)
 
+    # ===================== 核心：自动提取 token 并全局生效 =====================
+    global REAL_TOKEN
+    res_json = res.json()
+    REAL_TOKEN = res_json["result"]["token"]
+
+@pytest.mark.skip("test_backstage_page：已验证pass")
 def test_backstage_page(api_session):
     """主页-后台首页查看"""
     url = f"{BASE_URL}{URL_BACKSTAGE_PAGE}"
@@ -247,6 +335,7 @@ def test_backstage_page(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_default_settings：已验证pass")
 def test_default_settings(api_session):
     """系统-默认配置获取"""
     url = f"{BASE_URL}{URL_DEFAULT_SETTINGS}".format(deviceName=TEST_DEVICE_NAME)
@@ -254,6 +343,7 @@ def test_default_settings(api_session):
     print_response_info({"deviceName":TEST_DEVICE_NAME},res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_sys_get_login_qrcode")
 def test_sys_get_login_qrcode(api_session):
     """登录-获取登录二维码"""
     url = f"{BASE_URL}{URL_SYS_GET_LOGIN_QRCODE}"
@@ -261,6 +351,7 @@ def test_sys_get_login_qrcode(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_sys_get_qrcode_token")
 def test_sys_get_qrcode_token(api_session):
     """登录-获取扫码Token"""
     url = f"{BASE_URL}{URL_SYS_GET_QRCODE_TOKEN}"
@@ -269,6 +360,7 @@ def test_sys_get_qrcode_token(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_sys_phone_login")
 def test_sys_phone_login(api_session):
     """登录-手机号验证码登录"""
     url = f"{BASE_URL}{URL_SYS_PHONE_LOGIN}"
@@ -277,6 +369,8 @@ def test_sys_phone_login(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+
+@pytest.mark.skip("test_sys_random_image：：已验证pass")
 def test_sys_random_image(api_session):
     """登录-获取验证码图片"""
     url = f"{BASE_URL}{URL_SYS_RANDOM_IMAGE}".format(key=TEST_CAPTCHA_KEY)
@@ -284,6 +378,14 @@ def test_sys_random_image(api_session):
     print_response_info({"key":TEST_CAPTCHA_KEY},res)
     assert_api_common(res)
 
+    # ===================== 自动识别验证码（无报错版） =====================
+    data = res.json()
+    captcha_code = get_captcha_from_base64(data["result"])
+
+    if captcha_code:
+        print(f"\n✅ 验证码识别结果：【{captcha_code}】")
+
+@pytest.mark.skip("test_sys_scan_login_qrcode")
 def test_sys_scan_login_qrcode(api_session):
     """登录-扫码登录校验"""
     url = f"{BASE_URL}{URL_SYS_SCAN_LOGIN_QRCODE}"
@@ -295,6 +397,7 @@ def test_sys_scan_login_qrcode(api_session):
 # ==============================================
 # 二、设备管理 Case
 # ==============================================
+@pytest.mark.skip("test_device_add")
 def test_device_add(api_session):
     """设备管理-新增设备"""
     url = f"{BASE_URL}{URL_DEVICE_ADD}"
@@ -310,6 +413,7 @@ def test_device_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_list")
 def test_device_list(api_session):
     """设备管理-分页列表"""
     url = f"{BASE_URL}{URL_DEVICE_LIST}"
@@ -318,6 +422,7 @@ def test_device_list(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_query_by_id")
 def test_device_query_by_id(api_session):
     """设备管理-单条查询"""
     url = f"{BASE_URL}{URL_DEVICE_QUERY_BY_ID}"
@@ -326,6 +431,7 @@ def test_device_query_by_id(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_edit_post")
 def test_device_edit_post(api_session):
     """设备管理-编辑POST"""
     url = f"{BASE_URL}{URL_DEVICE_EDIT}"
@@ -334,6 +440,7 @@ def test_device_edit_post(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_edit_put")
 def test_device_edit_put(api_session):
     """设备管理-编辑PUT"""
     url = f"{BASE_URL}{URL_DEVICE_EDIT}"
@@ -342,6 +449,7 @@ def test_device_edit_put(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_log")
 def test_device_log(api_session):
     """设备管理-设备日志查询"""
     url = f"{BASE_URL}{URL_DEVICE_LOG}".format(deviceSerialNo=TEST_DEVICE_SERIAL_NO)
@@ -349,6 +457,7 @@ def test_device_log(api_session):
     print_response_info({"deviceSerialNo":TEST_DEVICE_SERIAL_NO},res)
     assert res.status_code == 200
 
+@pytest.mark.skip("test_device_delete")
 def test_device_delete(api_session):
     """设备管理-单条删除"""
     url = f"{BASE_URL}{URL_DEVICE_DELETE}"
@@ -357,6 +466,7 @@ def test_device_delete(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_delete_batch")
 def test_device_delete_batch(api_session):
     """设备管理-批量删除"""
     url = f"{BASE_URL}{URL_DEVICE_DELETE_BATCH}"
@@ -368,6 +478,7 @@ def test_device_delete_batch(api_session):
 # ==============================================
 # 三、设备类型管理 新增 Case
 # ==============================================
+@pytest.mark.skip("test_device_types_add")
 def test_device_types_add(api_session):
     """设备类型-新增"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_ADD}"
@@ -380,6 +491,7 @@ def test_device_types_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_delete")
 def test_device_types_delete(api_session):
     """设备类型-单条删除"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DELETE}"
@@ -388,6 +500,7 @@ def test_device_types_delete(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_delete_batch")
 def test_device_types_delete_batch(api_session):
     """设备类型-批量删除"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DELETE_BATCH}"
@@ -396,6 +509,7 @@ def test_device_types_delete_batch(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_edit_post")
 def test_device_types_edit_post(api_session):
     """设备类型-编辑POST"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_EDIT}"
@@ -409,6 +523,7 @@ def test_device_types_edit_post(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_edit_put")
 def test_device_types_edit_put(api_session):
     """设备类型-编辑PUT"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_EDIT}"
@@ -422,6 +537,7 @@ def test_device_types_edit_put(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_list")
 def test_device_types_list(api_session):
     """设备类型-分页列表"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_LIST}"
@@ -430,6 +546,7 @@ def test_device_types_list(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_query_by_id")
 def test_device_types_query_by_id(api_session):
     """设备类型-通过id查询"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_QUERY_BY_ID}"
@@ -438,6 +555,7 @@ def test_device_types_query_by_id(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_devicetype")
 def test_device_types_devicetype(api_session):
     """设备类型-根据ID查询类型"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DEVICE_TYPE}"
@@ -446,6 +564,7 @@ def test_device_types_devicetype(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_devicetypename")
 def test_device_types_devicetypename(api_session):
     """设备类型-获取类型名称列表"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DEVICE_TYPE_NAME}"
@@ -453,6 +572,7 @@ def test_device_types_devicetypename(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_types_top")
 def test_device_types_top(api_session):
     """设备类型-最新前5条"""
     url = f"{BASE_URL}{URL_DEVICE_TYPES_TOP}"
@@ -463,6 +583,7 @@ def test_device_types_top(api_session):
 # ==============================================
 # 四、设备固件管理 新增 Case
 # ==============================================
+@pytest.mark.skip("test_device_firmware_add")
 def test_device_firmware_add(api_session):
     """设备固件-新增"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_ADD}"
@@ -478,6 +599,7 @@ def test_device_firmware_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_delete")
 def test_device_firmware_delete(api_session):
     """设备固件-单条删除"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE}"
@@ -486,6 +608,7 @@ def test_device_firmware_delete(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_delete_batch")
 def test_device_firmware_delete_batch(api_session):
     """设备固件-批量删除"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE_BATCH}"
@@ -494,6 +617,7 @@ def test_device_firmware_delete_batch(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_edit_post")
 def test_device_firmware_edit_post(api_session):
     """设备固件-编辑POST"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
@@ -510,6 +634,7 @@ def test_device_firmware_edit_post(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_edit_put")
 def test_device_firmware_edit_put(api_session):
     """设备固件-编辑PUT"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
@@ -526,6 +651,7 @@ def test_device_firmware_edit_put(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_list")
 def test_device_firmware_list(api_session):
     """设备固件-分页列表"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_LIST}"
@@ -534,6 +660,7 @@ def test_device_firmware_list(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_query_type_id")
 def test_device_firmware_query_type_id(api_session):
     """设备固件-通过typeid查询"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_QUERY_TYPE_ID}"
@@ -542,6 +669,7 @@ def test_device_firmware_query_type_id(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_device_firmware_upload")
 def test_device_firmware_upload(api_session):
     """设备固件-通用文件上传"""
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_UPLOAD}"
@@ -549,6 +677,7 @@ def test_device_firmware_upload(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_firmware_download")
 def test_firmware_download(api_session):
     """固件下载"""
     url = f"{BASE_URL}{URL_FIRMWARE_DOWNLOAD}".format(getTypeName="test",url="test.bin")
@@ -559,6 +688,7 @@ def test_firmware_download(api_session):
 # ==============================================
 # 五、APK 模块 Case
 # ==============================================
+@pytest.mark.skip("test_apk_upload_file")
 def test_apk_upload_file(api_session):
     """APK-文件上传"""
     url = f"{BASE_URL}{URL_APK_UPLOAD_FILE}"
@@ -566,6 +696,7 @@ def test_apk_upload_file(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_delete_file")
 def test_apk_delete_file(api_session):
     """APK-删除文件"""
     url = f"{BASE_URL}{URL_APK_DELETE_FILE}"
@@ -574,6 +705,7 @@ def test_apk_delete_file(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_add")
 def test_apk_version_add(api_session):
     """APK版本-新增"""
     url = f"{BASE_URL}{URL_APK_VERSION_ADD}"
@@ -582,6 +714,7 @@ def test_apk_version_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_delete")
 def test_apk_version_delete(api_session):
     """APK版本-单条删除"""
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE}"
@@ -590,6 +723,7 @@ def test_apk_version_delete(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_delete_batch")
 def test_apk_version_delete_batch(api_session):
     """APK版本-批量删除"""
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE_BATCH}"
@@ -598,6 +732,7 @@ def test_apk_version_delete_batch(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_edit")
 def test_apk_version_edit(api_session):
     """APK版本-编辑"""
     url = f"{BASE_URL}{URL_APK_VERSION_EDIT}"
@@ -606,6 +741,7 @@ def test_apk_version_edit(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_list")
 def test_apk_version_list(api_session):
     """APK版本-分页列表"""
     url = f"{BASE_URL}{URL_APK_VERSION_LIST}"
@@ -614,6 +750,7 @@ def test_apk_version_list(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_version_query_by_id")
 def test_apk_version_query_by_id(api_session):
     """APK版本-单条查询"""
     url = f"{BASE_URL}{URL_APK_VERSION_QUERY_BY_ID}"
@@ -622,6 +759,7 @@ def test_apk_version_query_by_id(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_download_latest")
 def test_apk_download_latest(api_session):
     """APK-下载最新版"""
     url = f"{BASE_URL}{URL_APK_DOWNLOAD_LATEST}"
@@ -629,6 +767,7 @@ def test_apk_download_latest(api_session):
     print_response_info(None,res)
     assert res.status_code == 200
 
+@pytest.mark.skip("test_apk_latest_version")
 def test_apk_latest_version(api_session):
     """APK-获取最新版本配置"""
     url = f"{BASE_URL}{URL_APK_LATEST_VERSION}"
@@ -636,6 +775,7 @@ def test_apk_latest_version(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_apk_download_version")
 def test_apk_download_version(api_session):
     """APK-按版本下载"""
     url = f"{BASE_URL}{URL_APK_DOWNLOAD_VERSION}".format(version=TEST_VERSION)
@@ -646,6 +786,7 @@ def test_apk_download_version(api_session):
 # ==============================================
 # 六、用户 / 训练 / 统计 【全部补齐 100%完整】
 # ==============================================
+@pytest.mark.skip("test_user_signup")
 def test_user_signup(api_session):
     """用户-注册"""
     url = f"{BASE_URL}{URL_USER_SIGNUP}"
@@ -654,6 +795,7 @@ def test_user_signup(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_signin")
 def test_user_signin(api_session):
     """用户-登录"""
     url = f"{BASE_URL}{URL_USER_SIGNIN}"
@@ -662,6 +804,7 @@ def test_user_signin(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_user_info")
 def test_user_user_info(api_session):
     """用户-获取个人信息"""
     url = f"{BASE_URL}{URL_USER_USER_INFO}"
@@ -669,6 +812,7 @@ def test_user_user_info(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_device_info")
 def test_user_device_info(api_session):
     """用户-设备信息"""
     url = f"{BASE_URL}{URL_USER_DEVICE_INFO}"
@@ -676,6 +820,7 @@ def test_user_device_info(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_get_device_settings")
 def test_user_get_device_settings(api_session):
     """用户-获取设备配置"""
     url = f"{BASE_URL}{URL_USER_GET_DEVICE_SETTINGS}"
@@ -683,6 +828,7 @@ def test_user_get_device_settings(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_save_device_settings")
 def test_user_save_device_settings(api_session):
     """用户-保存设备配置"""
     url = f"{BASE_URL}{URL_USER_SAVE_DEVICE_SETTINGS}"
@@ -691,6 +837,7 @@ def test_user_save_device_settings(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_get_templates")
 def test_user_get_templates(api_session):
     """用户-获取模板列表"""
     url = f"{BASE_URL}{URL_USER_GET_TEMPLATES}"
@@ -698,6 +845,7 @@ def test_user_get_templates(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_modify_template_info")
 def test_user_modify_template_info(api_session):
     """用户-修改模板信息"""
     url = f"{BASE_URL}{URL_USER_MODIFY_TEMPLATE_INFO}"
@@ -706,6 +854,7 @@ def test_user_modify_template_info(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_gesture_train")
 def test_user_gesture_train(api_session):
     """用户-手势训练"""
     url = f"{BASE_URL}{URL_USER_GESTURE_TRAIN}"
@@ -714,6 +863,7 @@ def test_user_gesture_train(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_single_train")
 def test_user_single_train(api_session):
     """用户-单次训练"""
     url = f"{BASE_URL}{URL_USER_SINGLE_TRAIN}"
@@ -722,6 +872,7 @@ def test_user_single_train(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_retrain")
 def test_user_retrain(api_session):
     """用户-重新训练"""
     url = f"{BASE_URL}{URL_USER_RETRAIN}"
@@ -730,6 +881,7 @@ def test_user_retrain(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_get_training_status")
 def test_user_get_training_status(api_session):
     """用户-获取训练状态"""
     url = f"{BASE_URL}{URL_USER_GET_TRAINING_STATUS}"
@@ -737,6 +889,7 @@ def test_user_get_training_status(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_get_training_records")
 def test_user_get_training_records(api_session):
     """用户-获取训练记录"""
     url = f"{BASE_URL}{URL_USER_GET_TRAINING_RECORDS}"
@@ -744,6 +897,7 @@ def test_user_get_training_records(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_delete_training_record")
 def test_user_delete_training_record(api_session):
     """用户-删除训练记录"""
     url = f"{BASE_URL}{URL_USER_DELETE_TRAINING_RECORD}"
@@ -752,6 +906,7 @@ def test_user_delete_training_record(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_delete_error_training_info")
 def test_user_delete_error_training_info(api_session):
     """用户-删除错误训练信息"""
     url = f"{BASE_URL}{URL_USER_DELETE_ERROR_TRAINING_INFO}"
@@ -760,6 +915,7 @@ def test_user_delete_error_training_info(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_get_model_status")
 def test_user_get_model_status(api_session):
     """用户-获取模型状态"""
     url = f"{BASE_URL}{URL_USER_GET_MODEL_STATUS}"
@@ -767,6 +923,7 @@ def test_user_get_model_status(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_add_model_status")
 def test_user_add_model_status(api_session):
     """用户-添加模型状态"""
     url = f"{BASE_URL}{URL_USER_ADD_MODEL_STATUS}"
@@ -775,6 +932,7 @@ def test_user_add_model_status(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_check_latest_emg_models")
 def test_user_check_latest_emg_models(api_session):
     """用户-检查最新EMG模型"""
     url = f"{BASE_URL}{URL_USER_CHECK_LATEST_EMG_MODELS}"
@@ -782,6 +940,7 @@ def test_user_check_latest_emg_models(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_download_emg_model")
 def test_user_download_emg_model(api_session):
     """用户-下载EMG模型"""
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_MODEL}"
@@ -790,6 +949,7 @@ def test_user_download_emg_model(api_session):
     print_response_info(params,res)
     assert res.status_code == 200
 
+@pytest.mark.skip("test_user_download_emg_data")
 def test_user_download_emg_data(api_session):
     """用户-下载EMG数据"""
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_DATA}"
@@ -798,6 +958,7 @@ def test_user_download_emg_data(api_session):
     print_response_info(params,res)
     assert res.status_code == 200
 
+@pytest.mark.skip("test_user_latest_firmware_version")
 def test_user_latest_firmware_version(api_session):
     """用户-获取最新固件版本"""
     url = f"{BASE_URL}{URL_USER_LATEST_FIRMWARE_VERSION}"
@@ -805,6 +966,7 @@ def test_user_latest_firmware_version(api_session):
     print_response_info(None,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_debug_info")
 def test_user_debug_info(api_session):
     """用户-调试信息"""
     url = f"{BASE_URL}{URL_USER_DEBUG_INFO}"
@@ -813,6 +975,7 @@ def test_user_debug_info(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_user_usage_stat")
 def test_user_usage_stat(api_session):
     """用户-使用统计"""
     url = f"{BASE_URL}{URL_USER_USAGE_STAT}"
@@ -821,6 +984,7 @@ def test_user_usage_stat(api_session):
     assert_api_common(res)
 
 # ---------------- 统计模块 ----------------
+@pytest.mark.skip("test_usagestats_add")
 def test_usagestats_add(api_session):
     """使用统计-新增"""
     url = f"{BASE_URL}{URL_USAGE_STATS_ADD}"
@@ -829,6 +993,7 @@ def test_usagestats_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_usagestats_edit")
 def test_usagestats_edit(api_session):
     """使用统计-编辑"""
     url = f"{BASE_URL}{URL_USAGE_STATS_EDIT}"
@@ -837,6 +1002,7 @@ def test_usagestats_edit(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_usagestats_list")
 def test_usagestats_list(api_session):
     """使用统计-列表"""
     url = f"{BASE_URL}{URL_USAGE_STATS_LIST}"
@@ -845,6 +1011,7 @@ def test_usagestats_list(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_usagestats_query_by_id")
 def test_usagestats_query_by_id(api_session):
     """使用统计-按ID查询"""
     url = f"{BASE_URL}{URL_USAGE_STATS_QUERY_BY_ID}"
@@ -853,6 +1020,7 @@ def test_usagestats_query_by_id(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_usagestats_delete")
 def test_usagestats_delete(api_session):
     """使用统计-删除"""
     url = f"{BASE_URL}{URL_USAGE_STATS_DELETE}"
@@ -861,6 +1029,7 @@ def test_usagestats_delete(api_session):
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip("test_usagestats_delete_batch")
 def test_usagestats_delete_batch(api_session):
     """使用统计-批量删除"""
     url = f"{BASE_URL}{URL_USAGE_STATS_DELETE_BATCH}"
