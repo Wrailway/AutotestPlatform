@@ -1,4 +1,6 @@
 import base64
+import random
+
 import ddddocr
 import pytest
 import requests
@@ -328,86 +330,165 @@ def test_sys_random_image(api_session):
     print_response_info({"key":TEST_CAPTCHA_KEY},res)
     assert_api_common(res)
 
-# ==============================================
-# 二、设备管理
-# ==============================================
+# # ==============================================
+# # 二、设备管理
+# # ==============================================
+
+# 全局变量：自动保存后端生成的 真实ID 和 SN
+device_id = ""
+test_device_sn = ""
+
 def test_device_add(api_session):
-    """设备-新增设备"""
+    """设备-添加"""
     print(f"\n🚀 开始执行：{test_device_add.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_ADD}"
-    ts = int(time.time())
+
+    ts_int = int(time.time())
+    rand = random.randint(10, 99)
+
+    current_sn = f"SN{ts_int}{rand}"
+    current_activate_key = f"AK{ts_int}{rand}"
+    current_addr = f"11:22:33:44:{ts_int%100:02X}:{rand:02X}"
+
     json_data = {
-        "activateKey": f"ACT_{ts}",
-        "addr": f"11:22:33:44:55:{ts%100:02X}",
-        "deviceSerialNo": f"SN_{ts}",
-        "deviceTypeId": 1,
-        "forbidden": 0,
+        "activateKey": current_activate_key,
+        "addr": current_addr,
+        "chooseType": "0",
+        "dateOfManufacture": "2026-05-14T05:51:16.084Z",
+        "dealerId": "1",
+        "deviceSerialNo": current_sn,
+        "deviceTypeId": "15",
+        "forbidden": "0",
         "remark": "自动化测试"
     }
+
     res = safe_request(api_session, "post", url, json=json_data)
     print_response_info(json_data, res)
     assert_api_common(res)
 
+    global device_id, test_device_sn
+    test_device_sn = current_sn
+    print(f"✅ 设备添加完成！SN = {test_device_sn}")
+
+
 def test_device_list(api_session):
-    """设备-分页列表"""
+    """设备-分页列表查询"""
     print(f"\n🚀 开始执行：{test_device_list.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_LIST}"
-    params = {"pageNo":TEST_PAGE_NO,"pageSize":TEST_PAGE_SIZE}
-    res = safe_request(api_session,"get",url,params=params)
-    print_response_info(params,res)
+    params = {
+        "pageNo": TEST_PAGE_NO,
+        "pageSize": TEST_PAGE_SIZE
+    }
+
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
+
+    # ==============================================
+    # ✅ 核心：从分页列表中 根据 SN 查找当前设备 ID
+    # ==============================================
+    global device_id, test_device_sn
+    try:
+        data = res.json()
+        records = data.get("result", {}).get("records", [])
+
+        for item in records:
+            if item.get("deviceSerialNo") == test_device_sn:
+                device_id = str(item.get("id"))
+                print(f"\n🎉 成功找到设备！")
+                print(f"✅ SN: {test_device_sn}")
+                print(f"✅ 真实设备ID: {device_id}")
+                break
+
+    except Exception as e:
+        print(f"⚠️ 未找到设备: {e}")
 
 def test_device_query_by_id(api_session):
     """设备-单条查询"""
     print(f"\n🚀 开始执行：{test_device_query_by_id.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_QUERY_BY_ID}"
-    params = {"id": TEST_ID}
+    params = {"id": device_id}
     res = safe_request(api_session,"get",url,params=params)
     print_response_info(params,res)
     assert_api_common(res)
 
 def test_device_edit_post(api_session):
-    """设备-编辑POST"""
+    """设备-编辑（post)"""
     print(f"\n🚀 开始执行：{test_device_edit_post.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_EDIT}"
-    json_data = {"id": int(TEST_ID), "remark":"自动化编辑"}
-    res = safe_request(api_session,"post",url,json=json_data)
-    print_response_info(json_data,res)
+
+    json_data = {
+        "id": device_id,  # 固定ID=1，和添加/删除统一
+        "activateKey": f"AK_EDIT{int(time.time())}",
+        "addr": f"11:25:14:26:99:FF",
+        "dealerId": "1",
+        "deviceSerialNo": f"SN_EDIT{int(time.time())}",
+        "deviceTypeId": "15",  # 必须是你成功添加的有效值
+        "forbidden": "0",
+        "remark": "自动化编辑测试-成功"
+    }
+
+    res = safe_request(api_session, "post", url, json=json_data)
+    print_response_info(json_data, res)
     assert_api_common(res)
 
 def test_device_edit_put(api_session):
-    """设备-编辑PUT"""
+    """设备-编辑(put)"""
     print(f"\n🚀 开始执行：{test_device_edit_put.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_EDIT}"
-    json_data = {"id": int(TEST_ID), "remark":"自动化PUT编辑"}
-    res = safe_request(api_session,"put",url,json=json_data)
-    print_response_info(json_data,res)
+
+    json_data = {
+        "id": device_id,  # 必须传！你刚添加的设备ID
+        "activateKey": f"AK_PUT{int(time.time())}",
+        "addr": f"11:25:14:26:99:FF",
+        "dealerId": "1",
+        "deviceSerialNo": f"SN_PUT{int(time.time())}",
+        "deviceTypeId": "15",  # 必须是有效值！
+        "forbidden": "0",
+        "remark": "自动化PUT编辑-成功"
+    }
+
+    res = safe_request(api_session, "put", url, json=json_data)
+    print_response_info(json_data, res)
     assert_api_common(res)
 
 def test_device_log(api_session):
     """设备-设备日志查询"""
     print(f"\n🚀 开始执行：{test_device_log.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_LOG}".format(deviceSerialNo=TEST_DEVICE_SERIAL_NO)
-    res = safe_request(api_session,"get",url)
-    print_response_info({"deviceSerialNo":TEST_DEVICE_SERIAL_NO},res)
-    assert res.status_code == 200
+
+    # 拼接真实的设备序列号（和你添加的一致）
+    url = f"{BASE_URL}{URL_DEVICE_LOG}".format(deviceSerialNo=test_device_sn)
+
+    res = safe_request(api_session, "get", url)
+    print_response_info({"deviceSerialNo": test_device_sn}, res)
+    assert_api_common(res)
+
 
 def test_device_delete(api_session):
-    """设备-单条删除"""
+    """设备-通过id删除"""
     print(f"\n🚀 开始执行：{test_device_delete.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_DELETE}"
-    params = {"id": TEST_ID}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
+
+    params = {
+        "id": str(device_id)  # 后端要字符串类型！
+    }
+
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
 
 def test_device_delete_batch(api_session):
     """设备-批量删除"""
     print(f"\n🚀 开始执行：{test_device_delete_batch.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_DELETE_BATCH}"
-    params = {"ids": TEST_IDS}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
+
+    # ✅ 关键：后端要的是字符串，如 "1,2,3"，不是数组！
+    params = {
+        "ids": str(device_id)  # 单个ID也传字符串，批量用 "1,2,3"
+    }
+
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
 
 # ==============================================
