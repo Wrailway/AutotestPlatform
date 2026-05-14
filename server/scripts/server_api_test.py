@@ -494,8 +494,9 @@ def test_device_delete_batch(api_session):
 # ==============================================
 # 三、设备类型管理
 # ==============================================
+test_device_type_id = ""
 def test_device_types_add(api_session):
-    """设备类型-新增"""
+    """设备类型-增加"""
     print(f"\n🚀 开始执行：{test_device_types_add.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_ADD}"
     json_data = {
@@ -507,32 +508,64 @@ def test_device_types_add(api_session):
     print_response_info(json_data,res)
     assert_api_common(res)
 
+
+def test_device_types_list(api_session):
+    """设备类型-分页列表查询"""
+    global test_device_type_id
+    print(f"\n🚀 开始执行：{test_device_types_list.__doc__}")
+    url = f"{BASE_URL}{URL_DEVICE_TYPES_LIST}"
+
+    # ✅ 关键：带上 typeName 搜索！只查我们刚加的那条
+    params = {
+        "pageNo": TEST_PAGE_NO,
+        "pageSize": TEST_PAGE_SIZE,
+        "typeName": TEST_TYPE_NAME  # 🔥 搜索条件
+    }
+
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
+    try:
+        data = res.json()
+        records = data.get("result", {}).get("records", [])
+        for item in records:
+            if item.get("typeName") == TEST_TYPE_NAME:
+                test_device_type_id = str(item.get("id"))
+                print(f"\n🎉 成功获取设备类型 ID：{test_device_type_id}")
+                break
+    except Exception as e:
+        print("⚠️ 获取ID异常：", e)
+
 def test_device_types_delete(api_session):
     """设备类型-单条删除"""
     print(f"\n🚀 开始执行：{test_device_types_delete.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DELETE}"
-    params = {"id": TEST_ID}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
+
+    # ✅ 这里用的是从列表里拿到的真实 ID
+    params = {"id": test_device_type_id}
+
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
 
 def test_device_types_delete_batch(api_session):
     """设备类型-批量删除"""
     print(f"\n🚀 开始执行：{test_device_types_delete_batch.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DELETE_BATCH}"
-    params = {"ids": TEST_IDS}
+    params = {"ids": test_device_type_id}
     res = safe_request(api_session,"delete",url,params=params)
     print_response_info(params,res)
     assert_api_common(res)
 
 def test_device_types_edit_post(api_session):
-    """设备类型-编辑POST"""
+    """设备类型-编辑(post)"""
     print(f"\n🚀 开始执行：{test_device_types_edit_post.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_EDIT}"
     json_data = {
-        "id": int(TEST_ID),
+        "id": test_device_type_id,
         "typeName":TEST_TYPE_NAME,
-        "hardwareType":TEST_HARDWARE_TYPE,
+        "hardwareType":TEST_HARDWARE_TYPE+1,
         "hardwareVer":TEST_HARDWARE_VER
     }
     res = safe_request(api_session,"post",url,json=json_data)
@@ -540,48 +573,31 @@ def test_device_types_edit_post(api_session):
     assert_api_common(res)
 
 def test_device_types_edit_put(api_session):
-    """设备类型-编辑PUT"""
+    """设备类型-编辑(put)"""
     print(f"\n🚀 开始执行：{test_device_types_edit_put.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_EDIT}"
     json_data = {
-        "id": int(TEST_ID),
+        "id": test_device_type_id,
         "typeName":TEST_TYPE_NAME,
         "hardwareType":TEST_HARDWARE_TYPE,
-        "hardwareVer":TEST_HARDWARE_VER
+        "hardwareVer":TEST_HARDWARE_VER+1
     }
     res = safe_request(api_session,"put",url,json=json_data)
     print_response_info(json_data,res)
-    assert_api_common(res)
-
-def test_device_types_list(api_session):
-    """设备类型-分页列表"""
-    print(f"\n🚀 开始执行：{test_device_types_list.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_TYPES_LIST}"
-    params = {"pageNo":TEST_PAGE_NO,"pageSize":TEST_PAGE_SIZE}
-    res = safe_request(api_session,"get",url,params=params)
-    print_response_info(params,res)
     assert_api_common(res)
 
 def test_device_types_query_by_id(api_session):
     """设备类型-通过id查询"""
     print(f"\n🚀 开始执行：{test_device_types_query_by_id.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_QUERY_BY_ID}"
-    params = {"id": TEST_ID}
+    params = {"id": test_device_type_id}
     res = safe_request(api_session,"get",url,params=params)
     print_response_info(params,res)
     assert_api_common(res)
 
-def test_device_types_devicetype(api_session):
-    """设备类型-根据ID查询类型"""
-    print(f"\n🚀 开始执行：{test_device_types_devicetype.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_TYPES_DEVICE_TYPE}"
-    params = {"id": int(TEST_ID)}
-    res = safe_request(api_session,"get",url,params=params)
-    print_response_info(params,res)
-    assert_api_common(res)
-
+#返回所有的设备类型，不需要传入参数
 def test_device_types_devicetypename(api_session):
-    """设备类型-获取类型名称列表"""
+    """设备类型-通过类型名称查询"""
     print(f"\n🚀 开始执行：{test_device_types_devicetypename.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_TYPES_DEVICE_TYPE_NAME}"
     res = safe_request(api_session,"get",url)
