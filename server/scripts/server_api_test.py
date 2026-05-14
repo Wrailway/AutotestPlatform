@@ -68,12 +68,12 @@ URL_APK_DELETE_FILE = "/apk/upload/file"
 URL_APK_DOWNLOAD_LATEST = "/apks/downloadlatest"
 URL_APK_LATEST_VERSION = "/apks/latest_version.json"
 URL_APK_DOWNLOAD_VERSION = "/apks/{version}"
-URL_APK_VERSION_ADD = "/apk/version/add"
-URL_APK_VERSION_DELETE = "/apk/version/delete"
-URL_APK_VERSION_DELETE_BATCH = "/apk/version/deleteBatch"
-URL_APK_VERSION_EDIT = "/apk/version/edit"
-URL_APK_VERSION_LIST = "/apk/version/list"
-URL_APK_VERSION_QUERY_BY_ID = "/apk/version/queryById"
+URL_APK_VERSION_ADD = "/apk_version/apkVersion/add"
+URL_APK_VERSION_DELETE = "/apk_version/apkVersion/delete"
+URL_APK_VERSION_DELETE_BATCH = "apk_version/apkVersion/deleteBatch"
+URL_APK_VERSION_EDIT = "apk_version/apkVersion/edit"
+URL_APK_VERSION_LIST = "apk_version/apkVersion/list"
+URL_APK_VERSION_QUERY_BY_ID = "apk_version/apkVersion/queryById"
 
 # 六、设备用户
 URL_USER_DELETE_ERROR_TRAINING_INFO = "/user/delete_error_training_info"
@@ -621,7 +621,7 @@ def test_firmware_download(api_session):
     assert res.status_code == 200
 
 # ==============================================
-# 五、APK文件上传 && apk-download-controller && APK版本发布
+# 五、APK版本发布
 # ==============================================
 file_path = ""
 def test_apk_upload_file(api_session):
@@ -663,34 +663,45 @@ def test_apk_delete_file(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
-def test_apk_latest_version(api_session):
-    """apk-download-controller-获取APP最新版本"""
-    print(f"\n🚀 开始执行：{test_apk_latest_version.__doc__}")
-    url = f"{BASE_URL}{URL_APK_LATEST_VERSION}"
-    res = safe_request(api_session,"get",url)
-    print_response_info(None,res)
-    assert_api_common(res)
-
 def test_apk_version_add(api_session):
-    """APK版本-新增"""
+    """APK版本发布-添加"""
     print(f"\n🚀 开始执行：{test_apk_version_add.__doc__}")
     url = f"{BASE_URL}{URL_APK_VERSION_ADD}"
-    json_data = {"version":TEST_VERSION,"remark":"APK自动化测试"}
-    res = safe_request(api_session,"post",url,json=json_data)
-    print_response_info(json_data,res)
+
+    # 动态唯一版本号 ✅
+    version = f"1.0.1_{int(time.time())}"
+    version_name = f"V1.0.1_{int(time.time())}"
+
+    json_data = {
+        "appId": "com.neucir.flite",
+        "channel": 0,
+        "version": version,  # 版本号
+        "versionName": version_name,
+        "filePath": file_path,
+        "releaseNoteZh": "自动化测试版本",
+        "releaseNoteEn": "Auto test version",
+        "status": 1,
+        "creator": "admin"
+    }
+
+    res = safe_request(api_session, "post", url, json=json_data)
+    print_response_info(json_data, res)
     assert_api_common(res)
 
+
 def test_apk_version_delete(api_session):
-    """APK版本-单条删除"""
+    """APK版本发布-通过id删除"""
     print(f"\n🚀 开始执行：{test_apk_version_delete.__doc__}")
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE}"
+
     params = {"id": TEST_ID}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
+
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
 
 def test_apk_version_delete_batch(api_session):
-    """APK版本-批量删除"""
+    """APK版本发布-批量删除"""
     print(f"\n🚀 开始执行：{test_apk_version_delete_batch.__doc__}")
     url = f"{BASE_URL}{URL_APK_VERSION_DELETE_BATCH}"
     params = {"ids": TEST_IDS}
@@ -699,27 +710,59 @@ def test_apk_version_delete_batch(api_session):
     assert_api_common(res)
 
 def test_apk_version_edit_post(api_session):
-    """apk版本发布-编辑"""
+    """APK版本发布-编辑（post）"""
     print(f"\n🚀 开始执行：{test_apk_version_edit_post.__doc__}")
-    url = f"{BASE_URL}/apk/version/edit"
+    url = f"{BASE_URL}{URL_APK_VERSION_EDIT}"
+
+    # 动态生成新版本号（不重复）
+    new_version = f"1.0.1_{int(time.time())}"
+    new_version_name = f"V1.0.1_{int(time.time())}"
+
     json_data = {
-        "id": 1,
+        "id": 1,  # 固定ID=1，和删除保持一致
         "appId": "com.neucir.flite",
         "channel": 0,
-        "version": "1.0.0",
-        "versionName": "V1.0.0",
-        "filePath": "/apk/release/1.0.0.apk",
-        "releaseNoteZh": "优化体验",
-        "releaseNoteEn": "Optimize",
+        "version": new_version,  # 动态版本号
+        "versionName": new_version_name,
+        "filePath": file_path,  # 全局真实路径
+        "releaseNoteZh": "自动化编辑版本",
+        "releaseNoteEn": "Auto edit version",
         "status": 1,
-        "creator": "auto-test"
+        "creator": "admin"
     }
+
     res = safe_request(api_session, "post", url, json=json_data)
     print_response_info(json_data, res)
     assert_api_common(res)
 
+def test_apk_version_edit_put(api_session):
+    """APK版本发布-编辑（put）"""
+    print(f"\n🚀 开始执行：{test_apk_version_edit_put.__doc__}")
+    url = f"{BASE_URL}{URL_APK_VERSION_EDIT}"
+
+    # 动态生成唯一版本号（带时间戳，永不重复）
+    edit_version = f"1.0.1_{int(time.time())}"
+    edit_version_name = f"V1.0.1_{int(time.time())}"
+
+    json_data = {
+        "id": 1,  # 固定ID=1
+        "appId": "com.neucir.flite",
+        "channel": 0,
+        "version": edit_version,  # 动态版本号
+        "versionName": edit_version_name,
+        "filePath": file_path,  # 上传后的真实路径
+        "releaseNoteZh": "自动化编辑成功",
+        "releaseNoteEn": "Edit Success",
+        "status": 1,
+        "creator": "admin"
+    }
+
+    res = safe_request(api_session, "put", url, json=json_data)
+    print_response_info(json_data, res)
+    assert_api_common(res)
+
 def test_apk_version_list(api_session):
-    """APK版本-分页列表"""
+    """APK版本发布-分页列表"""
     print(f"\n🚀 开始执行：{test_apk_version_list.__doc__}")
     url = f"{BASE_URL}{URL_APK_VERSION_LIST}"
     params = {"pageNo":TEST_PAGE_NO,"pageSize":TEST_PAGE_SIZE}
@@ -728,12 +771,20 @@ def test_apk_version_list(api_session):
     assert_api_common(res)
 
 def test_apk_version_query_by_id(api_session):
-    """APK版本-单条查询"""
+    """APK版本发布-单条查询"""
     print(f"\n🚀 开始执行：{test_apk_version_query_by_id.__doc__}")
     url = f"{BASE_URL}{URL_APK_VERSION_QUERY_BY_ID}"
     params = {"id": TEST_ID}
     res = safe_request(api_session,"get",url,params=params)
     print_response_info(params,res)
+    assert_api_common(res)
+
+def test_apk_latest_version(api_session):
+    """apk-download-controller-获取APP最新版本"""
+    print(f"\n🚀 开始执行：{test_apk_latest_version.__doc__}")
+    url = f"{BASE_URL}{URL_APK_LATEST_VERSION}"
+    res = safe_request(api_session,"get",url)
+    print_response_info(None,res)
     assert_api_common(res)
 
 # ==============================================
