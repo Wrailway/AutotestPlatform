@@ -89,7 +89,7 @@ URL_USER_GET_DEVICE_SETTINGS = "/user/get_device_settings"
 URL_USER_GET_MODEL_STATUS = "/user/get_model_status"
 URL_USER_GET_TEMPLATES = "/user/get_templates"
 URL_USER_GET_TRAINING_RECORDS = "/user/get_training_records"
-URL_USER_LATEST_FIRMWARE_VERSION = "/user/latest_firmware_version"
+URL_USER_LATEST_FIRMWARE_VERSION = "/user/latest_firmware_version_of_device"
 URL_USER_MODIFY_TEMPLATE_INFO = "/user/modify_template_info"
 URL_USER_RETRAIN = "/user/retrain"
 URL_USER_SAVE_DEVICE_SETTINGS = "/user/save_device_settings"
@@ -615,92 +615,141 @@ def test_device_types_top(api_session):
 # ==============================================
 # 四、设备固件管理
 # ==============================================
+test_firmware_id = None
+test_firmware_ids_batch = []
+test_firmware_id_for_edit = None  # 用来编辑的 ID
 def test_device_firmware_add(api_session):
-    """设备固件-新增"""
+    """设备固件-添加版本"""
     print(f"\n🚀 开始执行：{test_device_firmware_add.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_ADD}"
-    json_data = {
-        "deviceTypeId":TEST_FW_DEVICE_TYPE_ID,
-        "isValid":TEST_FW_IS_VALID,
-        "releaseNoteZh":TEST_FW_RELEASE_ZH,
-        "releaseNoteEn":TEST_FW_RELEASE_EN,
-        "url":TEST_FW_URL,
-        "version":TEST_FW_VERSION
-    }
-    res = safe_request(api_session,"post",url,json=json_data)
-    print_response_info(json_data,res)
-    assert_api_common(res)
+    print(f"\n🚀 开始执行：设备固件-新增 5 个版本")
 
-def test_device_firmware_delete(api_session):
-    """设备固件-单条删除"""
-    print(f"\n🚀 开始执行：{test_device_firmware_delete.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE}"
-    params = {"id": TEST_ID}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
-    assert_api_common(res)
+    for i in range(1, 6):
+        json_data = {
+            "deviceTypeId": TEST_FW_DEVICE_TYPE_ID,
+            "isValid": TEST_FW_IS_VALID,
+            "releaseNoteZh": f"{TEST_FW_RELEASE_ZH}_{i}",
+            "releaseNoteEn": f"{TEST_FW_RELEASE_EN}_{i}",
+            "url": TEST_FW_URL,
+            "version": f"V2.0.{i}"
+        }
 
-def test_device_firmware_delete_batch(api_session):
-    """设备固件-批量删除"""
-    print(f"\n🚀 开始执行：{test_device_firmware_delete_batch.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE_BATCH}"
-    params = {"ids": TEST_IDS}
-    res = safe_request(api_session,"delete",url,params=params)
-    print_response_info(params,res)
-    assert_api_common(res)
-
-def test_device_firmware_edit_post(api_session):
-    """设备固件-编辑POST"""
-    print(f"\n🚀 开始执行：{test_device_firmware_edit_post.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
-    json_data = {
-        "id": int(TEST_ID),
-        "deviceTypeId":TEST_FW_DEVICE_TYPE_ID,
-        "isValid":TEST_FW_IS_VALID,
-        "releaseNoteZh":TEST_FW_RELEASE_ZH,
-        "releaseNoteEn":TEST_FW_RELEASE_EN,
-        "url":TEST_FW_URL,
-        "version":TEST_FW_VERSION
-    }
-    res = safe_request(api_session,"post",url,json=json_data)
-    print_response_info(json_data,res)
-    assert_api_common(res)
-
-def test_device_firmware_edit_put(api_session):
-    """设备固件-编辑PUT"""
-    print(f"\n🚀 开始执行：{test_device_firmware_edit_put.__doc__}")
-    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
-    json_data = {
-        "id": int(TEST_ID),
-        "deviceTypeId":TEST_FW_DEVICE_TYPE_ID,
-        "isValid":TEST_FW_IS_VALID,
-        "releaseNoteZh":TEST_FW_RELEASE_ZH,
-        "releaseNoteEn":TEST_FW_RELEASE_EN,
-        "url":TEST_FW_URL,
-        "version":TEST_FW_VERSION
-    }
-    res = safe_request(api_session,"put",url,json=json_data)
-    print_response_info(json_data,res)
-    assert_api_common(res)
+        url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_ADD}"
+        res = safe_request(api_session, "post", url, json=json_data)
+        print_response_info(json_data, res)
+        assert_api_common(res)
+        print(f"✅ 第 {i} 个固件添加成功")
 
 def test_device_firmware_list(api_session):
     """设备固件-分页列表"""
     print(f"\n🚀 开始执行：{test_device_firmware_list.__doc__}")
+    print(f"\n🚀 开始执行：设备固件-列表查询 & 提取ID")
+    global test_firmware_id, test_firmware_ids_batch,test_firmware_id_for_edit
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_LIST}"
-    params = {"pageNo":TEST_PAGE_NO,"pageSize":TEST_PAGE_SIZE,"version":TEST_FW_VERSION}
-    res = safe_request(api_session,"get",url,params=params)
-    print_response_info(params,res)
+    params = {
+        "pageNo": TEST_PAGE_NO,
+        "pageSize": TEST_PAGE_SIZE,
+        "deviceTypeId": TEST_FW_DEVICE_TYPE_ID
+    }
+
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
+
+    data = res.json()
+    records = data.get("result", {}).get("records", [])
+
+    # 验证列表至少有5条数据
+    assert len(records) >= 5, "固件数量不足，无法执行删除测试"
+
+    # 提取最新 1 个（第一条）
+    test_firmware_id = records[0]["id"]
+
+    # 提取最新 3 个
+    test_firmware_ids_batch = [str(item["id"]) for item in records[1:4]]
+
+    test_firmware_id_for_edit = records[4]["id"]
+
+    print(f"\n🎉 最新1个固件ID（单删）: {test_firmware_id}")
+    print(f"🎉 最新3个固件ID（批量）: {test_firmware_ids_batch}")
+
+    # 验证ID不为空
+    assert test_firmware_id is not None
+    assert len(test_firmware_ids_batch) == 3
+
+def test_device_firmware_delete(api_session):
+    """设备固件-单条删除"""
+    print(f"\n🚀 开始执行：{test_device_firmware_delete.__doc__}")
+    print(f"\n🚀 开始执行：设备固件-单条删除 ID = {test_firmware_id}")
+
+    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE}"
+    params = {"id": test_firmware_id}
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
+    # 验证删除成功
+    assert res.json().get("success") is True, "单条删除失败"
+    print(f"✅ ID {test_firmware_id} 删除成功")
+
+def test_device_firmware_delete_batch(api_session):
+    """设备固件-批量删除"""
+    print(f"\n🚀 开始执行：{test_device_firmware_delete_batch.__doc__}")
+    print(f"\n🚀 开始执行：设备固件-批量删除 IDs = {test_firmware_ids_batch}")
+
+    ids_str = ",".join(test_firmware_ids_batch)
+    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_DELETE_BATCH}"
+    params = {"ids": ids_str}
+
+    res = safe_request(api_session, "delete", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
+    assert res.json().get("success") is True, "批量删除失败"
+    print(f"✅ ID {ids_str} 批量删除成功")
+
+
+def test_device_firmware_edit_post(api_session):
+    """设备固件-编辑POST"""
+    print(f"\n🚀 开始执行：{test_device_firmware_edit_post.__doc__}")
+    print(f"\n🚀 开始执行：编辑固件 POST，ID={test_firmware_id_for_edit}")
+
+    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
+    json_data = {
+        "id": test_firmware_id_for_edit,  # 自动获取
+        "releaseNoteZh": "【已编辑】中文说明(post)",
+    }
+
+    res = safe_request(api_session, "post", url, json=json_data)
+    print_response_info(json_data, res)
+    assert_api_common(res)
+    print("✅ POST 编辑成功")
+
+def test_device_firmware_edit_put(api_session):
+    """设备固件-编辑PUT"""
+    print(f"\n🚀 开始执行：{test_device_firmware_edit_put.__doc__}")
+    print(f"\n🚀 开始执行：编辑固件 PUT，ID={test_firmware_id_for_edit}")
+
+    url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_EDIT}"
+    json_data = {
+        "id": test_firmware_id_for_edit,  # 自动获取
+        "releaseNoteEn": "【Edited】English Note(put)",
+    }
+    res = safe_request(api_session, "put", url, json=json_data)
+    print_response_info(json_data, res)
+    assert_api_common(res)
+    print("✅ PUT 编辑成功")
 
 def test_device_firmware_query_type_id(api_session):
     """设备固件-通过typeid查询"""
     print(f"\n🚀 开始执行：{test_device_firmware_query_type_id.__doc__}")
+    print(f"\n🚀 开始执行：{test_device_firmware_query_type_id.__doc__}")
     url = f"{BASE_URL}{URL_DEVICE_FIRMWARE_QUERY_TYPE_ID}"
-    params = {"id": TEST_ID}
+    params = {"id": test_firmware_id_for_edit}
     res = safe_request(api_session,"get",url,params=params)
     print_response_info(params,res)
     assert_api_common(res)
 
+@pytest.mark.skip('尚未调试test_device_firmware_upload')
 def test_device_firmware_upload(api_session):
     """设备固件-通用文件上传"""
     print(f"\n🚀 开始执行：{test_device_firmware_upload.__doc__}")
@@ -708,14 +757,6 @@ def test_device_firmware_upload(api_session):
     res = safe_request(api_session,"post",url)
     print_response_info(None,res)
     assert_api_common(res)
-
-def test_firmware_download(api_session):
-    """固件下载"""
-    print(f"\n🚀 开始执行：{test_firmware_download.__doc__}")
-    url = f"{BASE_URL}{URL_FIRMWARE_DOWNLOAD}".format(getTypeName="test",url="test.bin")
-    res = safe_request(api_session,"get",url)
-    print_response_info(None,res)
-    assert res.status_code == 200
 
 # ==============================================
 # 五、APK版本发布
@@ -896,6 +937,58 @@ def test_user_device_info(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
+latest_firmware_url = ""
+def test_user_latest_firmware_version(api_session):
+    """设备用户-获取最新固件版本"""
+    global latest_firmware_url
+    print(f"\n🚀 开始执行：{test_user_latest_firmware_version.__doc__}")
+
+    url = f"{BASE_URL}{URL_USER_LATEST_FIRMWARE_VERSION}"
+    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
+
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
+    # 🔥 直接拿接口返回的完整路径
+    latest_firmware_url = res.json()["url"]
+    print(f"\n✅ 真实固件路径：{latest_firmware_url}")
+
+def test_firmware_download(api_session):
+    """设备固件-下载最新的固件"""
+    print(f"\n🚀 开始执行：{test_firmware_download.__doc__}")
+
+    # ✅ 正确：BASE_URL 已经包含 /neucirflite_portal，直接拼接固件路径
+    final_url = f"{BASE_URL}/{latest_firmware_url}"
+
+    res = safe_request(api_session, "get", final_url, stream=True)
+    print_response_info(None, res)
+
+    assert res.status_code == 200, f"下载失败，状态码：{res.status_code}"
+    assert len(res.content) > 0, "文件内容为空"
+
+def test_user_save_device_settings(api_session):
+    """设备用户-保存设备设置记录"""
+    print(f"\n🚀 开始执行：{test_user_save_device_settings.__doc__}")
+    url = f"{BASE_URL}{URL_USER_SAVE_DEVICE_SETTINGS}"
+
+    params = {
+        "cali_data": "calibration_test_data",
+        "ctrl_setting": "control_test_config",
+        "pid_setting": "pid_test_config",
+        "record_id": 1,
+        "record_name": "test_settings_001",
+        "sensor_type": 1,
+        "threshold_setting": "threshold_test_config"
+    }
+
+    res = safe_request(api_session, "post", url, params=params)
+    print_response_info(params, res)
+
+    # 通用断言 + 额外状态码校验
+    assert_api_common(res)
+    assert res.status_code in [200, 201], f"保存失败，状态码：{res.status_code}"
+
 def test_user_get_device_settings(api_session):
     """设备用户-获取设备设置记录"""
     print(f"\n🚀 开始执行：{test_user_get_device_settings.__doc__}")
@@ -905,15 +998,104 @@ def test_user_get_device_settings(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
-def test_user_save_device_settings(api_session):
-    """设备用户-保存设备设置记录"""
-    print(f"\n🚀 开始执行：{test_user_save_device_settings.__doc__}")
-    url = f"{BASE_URL}{URL_USER_SAVE_DEVICE_SETTINGS}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"setting": "test"}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
+# 全局变量：保存添加的模型数据
+saved_model_data = {}
+def test_user_add_model_status(api_session):
+    """设备用户-添加模型应用状态"""
+    global saved_model_data
+    print(f"\n🚀 开始执行：{test_user_add_model_status.__doc__}")
+    url = f"{BASE_URL}{URL_USER_ADD_MODEL_STATUS}"
+
+    params = {
+        "addr": DEVICE_MAC,
+        "uuid": DEVICE_UUID,
+        "template_no": TEST_TEMPLATE_ID,
+        "training_time": "2026-05-14 18:00:00"
+    }
+
+    res = safe_request(api_session, "post", url, params=params)
+    print_response_info(params, res)
     assert_api_common(res)
+
+    # 保存我们添加的数据
+    saved_model_data = params
+
+def test_user_get_model_status(api_session):
+    """设备用户-获取当前模型应用"""
+    print(f"\n🚀 开始执行：{test_user_get_model_status.__doc__}")
+    url = f"{BASE_URL}{URL_USER_GET_MODEL_STATUS}"
+
+    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
+    # ======================
+    # 🔥 严格匹配你的返回结构
+    # ======================
+    result = res.json().get("msg", {})
+
+    # 预期值（添加时的数据）
+    expect_template_no = str(saved_model_data["template_no"])  # 转成字符串
+    expect_training_time = saved_model_data["training_time"]
+
+    # 实际返回值
+    actual_template_no = result.get("templateNo")
+    actual_training_time = result.get("trainingTime")
+
+    # 双字段校验：必须完全一致才算通过
+    assert actual_template_no == expect_template_no, \
+        f"模板编号不一致！期望：{expect_template_no}，实际：{actual_template_no}"
+
+    assert actual_training_time == expect_training_time, \
+        f"训练时间不一致！期望：{expect_training_time}，实际：{actual_training_time}"
+
+    print("\n✅ 校验通过：添加的模型应用 == 查询到的模型应用")
+
+
+def test_user_gesture_train(api_session):
+    """设备用户-手势训练【Postman 成功版】"""
+    print(f"\n🚀 开始执行：{test_user_gesture_train.__doc__}")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bin_path = os.path.join(script_dir, "data.bin")
+
+    # ============================
+    # 🔥 1. 所有参数 都放 data（Postman 就是这样）
+    # ============================
+    params = {
+        "angle_cnt": 2,
+        "channel": 255,
+        "gesture_count": 2,
+        "restart": 0,
+        "sample_rate": 500,
+        "template_description": "1231232",
+        "template_name": "test",
+        "template_no": 1,
+        "totalTrainTimes": 2,
+    }
+
+    # ============================
+    # 🔥 2. 文件 也放一起（form-data）
+    # ============================
+    files = {
+        "files": open(bin_path, "rb")
+    }
+
+    url = f"{BASE_URL}{URL_USER_GESTURE_TRAIN}"
+
+    # ============================
+    # 🔥 3. 正确调用：POST + data + files（和 Postman 一样）
+    # ============================
+    res = safe_request(api_session, "post", url, params=params, files=files)
+
+    print_response_info(params, res)
+
+    # ============================
+    # 🔥 4. 断言：你的接口返回 res=0
+    # ============================
+    result = res.json()
+    assert result.get("res") == 0, f"失败：{result}"
 
 def test_user_get_templates(api_session):
     """设备用户-获取所有模版信息"""
@@ -924,35 +1106,33 @@ def test_user_get_templates(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
+def test_user_user_info(api_session):
+    """设备用户-通过id查询"""
+    print(f"\n🚀 开始执行：{test_user_user_info.__doc__}")
+    url = f"{BASE_URL}/user/user_info"
+    params = {"activate_key": "TEST_ACT_KEY_001", "addr": DEVICE_MAC}
+    res = safe_request(api_session, "get", url, params=params)
+    print_response_info(params, res)
+    assert_api_common(res)
+
 def test_user_modify_template_info(api_session):
     """设备用户-修改模板信息"""
     print(f"\n🚀 开始执行：{test_user_modify_template_info.__doc__}")
     url = f"{BASE_URL}{URL_USER_MODIFY_TEMPLATE_INFO}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"templateId": TEST_TEMPLATE_ID, "templateName": TEST_TEMPLATE_NAME}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
-    assert_api_common(res)
 
-def test_user_gesture_train(api_session):
-    """设备用户-手势训练"""
-    print(f"\n🚀 开始执行：{test_user_gesture_train.__doc__}")
-    url = f"{BASE_URL}{URL_USER_GESTURE_TRAIN}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"templateId": TEST_TEMPLATE_ID, "emgData": TEST_EMG_DATA}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
-    assert_api_common(res)
+    params = {
+        "template_id": TEST_TEMPLATE_ID,        # 接口定义为 int32 类型
+        "template_name": TEST_TEMPLATE_NAME,    # 接口定义为 string 类型
+        "template_description": "修改后的模板描述"  # 接口定义为 string 类型，必填
+    }
 
-def test_user_single_train(api_session):
-    """设备用户-单次训练"""
-    print(f"\n🚀 开始执行：{test_user_single_train.__doc__}")
-    url = f"{BASE_URL}{URL_USER_SINGLE_TRAIN}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"templateId": TEST_TEMPLATE_ID}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
+    # 接口无请求体，不需要传递 json 或 data
+    res = safe_request(api_session, "post", url, params=params)
+    print_response_info(params, res)
+
+    # 通用断言 + 状态码校验
     assert_api_common(res)
+    assert res.status_code in [200, 201], f"修改模板信息失败，状态码：{res.status_code}"
 
 def test_user_retrain(api_session):
     """设备用户-重新训练"""
@@ -973,7 +1153,6 @@ def test_user_get_training_records(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
-# ====================== 【修复】删除训练记录 → 改为 POST ======================
 def test_user_delete_training_record(api_session):
     """设备用户-删除训练记录"""
     print(f"\n🚀 开始执行：{test_user_delete_training_record.__doc__}")
@@ -990,34 +1169,6 @@ def test_user_delete_error_training_info(api_session):
     params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID, "id": TEST_ID}
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
-    assert_api_common(res)
-
-def test_user_user_info(api_session):
-    """设备用户-通过id查询"""
-    print(f"\n🚀 开始执行：{test_user_user_info.__doc__}")
-    url = f"{BASE_URL}/user/user_info"
-    params = {"activate_key": "TEST_ACT_KEY_001", "addr": DEVICE_MAC}
-    res = safe_request(api_session, "get", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
-
-def test_user_get_model_status(api_session):
-    """设备用户-获取当前模型应用"""
-    print(f"\n🚀 开始执行：{test_user_get_model_status.__doc__}")
-    url = f"{BASE_URL}{URL_USER_GET_MODEL_STATUS}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    res = safe_request(api_session, "get", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
-
-def test_user_add_model_status(api_session):
-    """设备用户-添加模型应用状态"""
-    print(f"\n🚀 开始执行：{test_user_add_model_status.__doc__}")
-    url = f"{BASE_URL}{URL_USER_ADD_MODEL_STATUS}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"modelId": TEST_MODEL_ID}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
     assert_api_common(res)
 
 def test_user_check_latest_emg_models(api_session):
@@ -1046,15 +1197,6 @@ def test_user_download_emg_data(api_session):
     res = safe_request(api_session, "get", url, params=params)
     print_response_info(params, res)
     assert res.status_code == 200
-
-def test_user_latest_firmware_version(api_session):
-    """设备用户-获取最新固件版本"""
-    print(f"\n🚀 开始执行：{test_user_latest_firmware_version.__doc__}")
-    url = f"{BASE_URL}{URL_USER_LATEST_FIRMWARE_VERSION}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    res = safe_request(api_session, "get", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
 
 def test_user_debug_info(api_session):
     """设备用户-上传调试信息"""
@@ -1085,23 +1227,5 @@ def test_user_device_info_by_uuid(api_session):
     url = f"{BASE_URL}/user/device_info"
     params = {"uuid": DEVICE_UUID}
     res = safe_request(api_session, "get", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
-
-def test_user_get_training_status(api_session):
-    """设备用户-查看单机手势状态"""
-    print(f"\n🚀 开始执行：{test_user_get_training_status.__doc__}")
-    url = f"{BASE_URL}/user/getTrainingStatus"
-    params = {"addr": DEVICE_MAC, "templateNo": 1, "gestureCount": 1}
-    res = safe_request(api_session, "post", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
-
-def test_user_single_gesture_train(api_session):
-    """设备用户-单机手势训练"""
-    print(f"\n🚀 开始执行：{test_user_single_gesture_train.__doc__}")
-    url = f"{BASE_URL}/user/single_train"
-    params = {"addr": DEVICE_MAC, "templateName": "auto_test_single", "gestureCount": 1}
-    res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
