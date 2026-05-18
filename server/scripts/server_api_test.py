@@ -91,6 +91,7 @@ URL_USER_GET_TRAINING_STATUS = "/user/getTrainingStatus"
 URL_USER_GET_DEVICE_SETTINGS = "/user/get_device_settings"
 URL_USER_GET_MODEL_STATUS = "/user/get_model_status"
 URL_USER_GET_TEMPLATES = "/user/get_templates"
+URL_USER_GET_USER_INFO = "/user/user_info"
 URL_USER_GET_TRAINING_RECORDS = "/user/get_training_records"
 URL_USER_LATEST_FIRMWARE_VERSION = "/user/latest_firmware_version_of_device"
 URL_USER_MODIFY_TEMPLATE_INFO = "/user/modify_template_info"
@@ -855,24 +856,32 @@ def test_user_device_info(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
+latest_firmware_url = ""
 def test_user_latest_firmware_version(api_session):
     """设备用户-获取最新固件版本"""
     global latest_firmware_url
     print(f"\n🚀 开始执行：{test_user_latest_firmware_version.__doc__}")
+
     url = f"{BASE_URL}{URL_USER_LATEST_FIRMWARE_VERSION}"
     params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
+
     res = safe_request(api_session, "get", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
+
+    # 🔥 直接拿接口返回的完整路径
     latest_firmware_url = res.json()["url"]
     print(f"\n✅ 真实固件路径：{latest_firmware_url}")
 
 def test_firmware_download(api_session):
     """设备固件-下载最新的固件"""
     print(f"\n🚀 开始执行：{test_firmware_download.__doc__}")
+
+    # ✅ 正确：BASE_URL 已经包含 /neucirflite_portal，直接拼接固件路径
     final_url = f"{BASE_URL}/{latest_firmware_url}"
     res = safe_request(api_session, "get", final_url, stream=True)
     print_response_info(None, res)
+
     assert res.status_code == 200, f"下载失败，状态码：{res.status_code}"
     assert len(res.content) > 0, "文件内容为空"
 
@@ -889,8 +898,11 @@ def test_user_save_device_settings(api_session):
         "sensor_type": 1,
         "threshold_setting": "threshold_test_config"
     }
+
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
+
+    # 通用断言 + 额外状态码校验
     assert_api_common(res)
     assert res.status_code in [200, 201], f"保存失败，状态码：{res.status_code}"
 
@@ -903,65 +915,86 @@ def test_user_get_device_settings(api_session):
     print_response_info(params, res)
     assert_api_common(res)
 
+# 全局变量：保存添加的模型数据
+saved_model_data = {}
 def test_user_add_model_status(api_session):
     """设备用户-添加模型应用状态"""
     global saved_model_data
     print(f"\n🚀 开始执行：{test_user_add_model_status.__doc__}")
     url = f"{BASE_URL}{URL_USER_ADD_MODEL_STATUS}"
+
     params = {
         "addr": DEVICE_MAC,
         "uuid": DEVICE_UUID,
         "template_no": TEST_TEMPLATE_ID,
         "training_time": "2026-05-14 18:00:00"
     }
+
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
+
+    # 保存我们添加的数据
     saved_model_data = params
 
 def test_user_get_model_status(api_session):
     """设备用户-获取当前模型应用"""
     print(f"\n🚀 开始执行：{test_user_get_model_status.__doc__}")
     url = f"{BASE_URL}{URL_USER_GET_MODEL_STATUS}"
+
     params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
     res = safe_request(api_session, "get", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
-
     result = res.json().get("msg", {})
-    expect_template_no = str(saved_model_data["template_no"])
+
+    # 预期值（添加时的数据）
+    expect_template_no = str(saved_model_data["template_no"])  # 转成字符串
     expect_training_time = saved_model_data["training_time"]
+
+    # 实际返回值
     actual_template_no = result.get("templateNo")
     actual_training_time = result.get("trainingTime")
 
-    assert actual_template_no == expect_template_no, "模板编号不一致"
-    assert actual_training_time == expect_training_time, "训练时间不一致"
+    assert actual_template_no == expect_template_no, \
+        f"模板编号不一致！期望：{expect_template_no}，实际：{actual_template_no}"
+
+    assert actual_training_time == expect_training_time, \
+        f"训练时间不一致！期望：{expect_training_time}，实际：{actual_training_time}"
+
     print("\n✅ 校验通过：添加的模型应用 == 查询到的模型应用")
 
-@pytest.mark.skip('尚未调通，test_user_gesture_train')
 def test_user_gesture_train(api_session):
     """设备用户-手势训练"""
-    print(f"\n🚀 开始执行：{test_user_gesture_train.__doc__}")
+    print(f"\n开始执行：{test_user_gesture_train.__doc__}")
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     bin_path = os.path.join(script_dir, "data.bin")
 
-    params = {
+    data = {
         "angle_cnt": 2,
         "channel": 255,
+        "channelNUm": 255,
         "gesture_count": 2,
         "restart": 0,
         "sample_rate": 500,
-        "template_description": "1231232",
+        "template_description": "新测试",
         "template_name": "test",
-        "template_no": 1,
+        "template_no": 2,
         "totalTrainTimes": 2,
     }
-    files = {"files": open(bin_path, "rb")}
+
     url = f"{BASE_URL}{URL_USER_GESTURE_TRAIN}"
-    res = safe_request(api_session, "post", url, params=params, files=files)
-    print_response_info(params, res)
-    result = res.json()
-    assert result.get("res") == 0, f"失败：{result}"
+    api_session.headers.pop("Content-Type", None)
+
+    with open(bin_path, "rb") as f:
+        files = [
+            ("files", ("data.bin", f, "application/octet-stream"))
+        ]
+
+        res = safe_request(api_session, "post", url, data=data, files=files)
+        assert_api_common(res)
+        print("✅ 手势训练接口测试通过！")
 
 def test_user_get_templates(api_session):
     """设备用户-获取所有模版信息"""
@@ -976,83 +1009,92 @@ def test_user_get_templates(api_session):
 def test_user_user_info(api_session):
     """设备用户-通过id查询"""
     print(f"\n🚀 开始执行：{test_user_user_info.__doc__}")
-    url = f"{BASE_URL}/user/user_info"
+    url = f"{BASE_URL}{URL_USER_GET_USER_INFO}"
     params = {"activate_key": "TEST_ACT_KEY_001", "addr": DEVICE_MAC}
     res = safe_request(api_session, "get", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
-
-@pytest.mark.skip('尚未调通，test_user_modify_template_info')
+#
+@pytest.mark.skip('test_user_modify_template_info')
 def test_user_modify_template_info(api_session):
     """设备用户-修改模板信息"""
     print(f"\n🚀 开始执行：{test_user_modify_template_info.__doc__}")
     url = f"{BASE_URL}{URL_USER_MODIFY_TEMPLATE_INFO}"
     params = {
-        "template_id": TEST_TEMPLATE_ID,
-        "template_name": TEST_TEMPLATE_NAME,
-        "template_description": "修改后的模板描述"
+        "template_id": 956,
+        "template_name": "修改后的模板名称",
+        "template_description": "修改后的描述"
     }
-    res = safe_request(api_session, "post", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
-    assert res.status_code in [200, 201], f"修改模板信息失败，状态码：{res.status_code}"
 
-@pytest.mark.skip('尚未调通，test_user_retrain')
+    # 发送请求：POST + params（swagger 标准格式）
+    res = safe_request(api_session, "post", url, params=params)
+
+    print_response_info(params, res)
+
+    # 断言
+    assert_api_common(res)
+#
+# @pytest.mark.skip('尚未调通，test_user_retrain')
 def test_user_retrain(api_session):
-    """设备用户-重新训练"""
+    """设备用户-重新训练【swagger 精准版】"""
     print(f"\n🚀 开始执行：{test_user_retrain.__doc__}")
     url = f"{BASE_URL}{URL_USER_RETRAIN}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    json_data = {"templateId": TEST_TEMPLATE_ID}
-    res = safe_request(api_session, "post", url, json=json_data, params=params)
-    print_response_info({**params, **json_data}, res)
-    assert_api_common(res)
 
-@pytest.mark.skip('需要真实参数')
+    params = {
+        "template_no": 2,          # 必传：你的模板编号（int数字）
+        "training_time": "60"     # 必传：训练时间（字符串）
+    }
+
+    res = safe_request(api_session, "post", url, params=params)
+
+    print_response_info(params, res)
+    assert_api_common(res)
+#
+# @pytest.mark.skip('需要真实参数，test_user_retrain')
 def test_user_get_training_records(api_session):
     """设备用户-获取训练记录"""
     print(f"\n🚀 开始执行：{test_user_get_training_records.__doc__}")
+
     url = f"{BASE_URL}{URL_USER_GET_TRAINING_RECORDS}"
     page_no = 1
-    template_no = 1
+    template_no = 2
+
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
         "page_no": page_no,
         "template_no": template_no
     }
+
     res = safe_request(api_session, "get", url, params=params)
+
     print_response_info(params, res)
     assert_api_common(res)
-
-@pytest.mark.skip('需要真实参数')
+#
+@pytest.mark.skip('test_user_delete_training_record')
 def test_user_delete_training_record(api_session):
     """设备用户-删除训练记录"""
     print(f"\n🚀 开始执行：{test_user_delete_training_record.__doc__}")
     url = f"{BASE_URL}{URL_USER_DELETE_TRAINING_RECORD}"
-    template_no = 1
-    training_time = "2026-05-15 12:00:00"
+    template_no = 2
+    training_time = "2026-05-18_14-33-08"
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
         "template_no": template_no,
         "training_time": training_time
     }
+
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
-
-@pytest.mark.skip('需要真实参数')
+#
+# @pytest.mark.skip('test_user_delete_error_training_info')
 def test_user_delete_error_training_info(api_session):
     """设备用户-删除错误训练信息"""
     print(f"\n🚀 开始执行：{test_user_delete_error_training_info.__doc__}")
     url = f"{BASE_URL}{URL_USER_DELETE_ERROR_TRAINING_INFO}"
-    emg_model_id = 1
+    emg_model_id = 133
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
         "emg_model_id": emg_model_id
     }
+
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
@@ -1061,61 +1103,66 @@ def test_user_check_latest_emg_models(api_session):
     """设备用户-查询有无训练完成的模型"""
     print(f"\n🚀 开始执行：{test_user_check_latest_emg_models.__doc__}")
     url = f"{BASE_URL}{URL_USER_CHECK_LATEST_EMG_MODELS}"
-    params = {"addr": DEVICE_MAC, "uuid": DEVICE_UUID}
-    res = safe_request(api_session, "get", url, params=params)
-    print_response_info(params, res)
-    assert_api_common(res)
 
-@pytest.mark.skip('需要真实参数')
+    # 🔥 重点：这个接口【不需要传任何 params】！！！
+    res = safe_request(api_session, "get", url)
+
+    print_response_info({}, res)
+    assert_api_common(res)
+#
+@pytest.mark.skip('test_user_download_emg_model')
 def test_user_download_emg_model(api_session):
     """设备用户-应用EMG模型"""
     print(f"\n🚀 开始执行：{test_user_download_emg_model.__doc__}")
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_MODEL}"
-    template_no = 1
-    training_time = "2026-05-15 12:00:00"
+    template_no = 133
+    training_time = "2026-05-18 14:33:08"
+
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
         "template_no": template_no,
         "training_time": training_time
     }
+
     res = safe_request(api_session, "get", url, params=params, stream=True)
+
     print_response_info(params, res)
     assert_api_common(res)
-
+#
 def test_user_download_emg_data(api_session):
     """设备用户-下载训练数据"""
     print(f"\n🚀 开始执行：{test_user_download_emg_data.__doc__}")
+
     url = f"{BASE_URL}{URL_USER_DOWNLOAD_EMG_DATA}"
-    template_no = 1
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
-        "template_no": template_no
+        "template_no": 2  # 真实有效、你已存在的模板编号
     }
-    res = safe_request(api_session, "get", url, params=params)
+
+    res = safe_request(api_session, "get", url, params=params, stream=True)
+
     print_response_info(params, res)
     assert_api_common(res)
 
 def test_user_debug_info(api_session):
     """设备用户-上传调试信息"""
     print(f"\n🚀 开始执行：{test_user_debug_info.__doc__}")
+
     url = f"{BASE_URL}{URL_USER_DEBUG_INFO}"
-    debug_info = "test_debug_info"
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
-        "debug_info": debug_info
+        "debug_info": "自动化测试上传调试信息"  # 必传字符串
     }
+
     res = safe_request(api_session, "post", url, params=params)
+
     print_response_info(params, res)
     assert_api_common(res)
 
-@pytest.mark.skip('需要真实参数')
+@pytest.mark.skip('test_user_usage_stat')
 def test_user_usage_stat(api_session):
     """设备用户-上传使用数据"""
     print(f"\n🚀 开始执行：{test_user_usage_stat.__doc__}")
+
     url = f"{BASE_URL}{URL_USER_USAGE_STAT}"
+
     latitude = 31.23
     longitude = 121.47
     total_open_times_1 = 1
@@ -1126,8 +1173,6 @@ def test_user_usage_stat(api_session):
     total_use_time = 100
 
     params = {
-        "addr": DEVICE_MAC,
-        "uuid": DEVICE_UUID,
         "latitude": latitude,
         "longitude": longitude,
         "total_open_times_1": total_open_times_1,
@@ -1137,15 +1182,20 @@ def test_user_usage_stat(api_session):
         "total_open_times_5": total_open_times_5,
         "total_use_time": total_use_time
     }
+
     res = safe_request(api_session, "post", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
-
+#
 def test_user_device_info_by_uuid(api_session):
     """设备用户-获取产品信息"""
     print(f"\n🚀 开始执行：{test_user_device_info_by_uuid.__doc__}")
     url = f"{BASE_URL}{URL_USER_DEVICE_INFO}"
-    params = {"uuid": DEVICE_UUID}
+
+    params = {
+        "uuid": DEVICE_UUID
+    }
+
     res = safe_request(api_session, "get", url, params=params)
     print_response_info(params, res)
     assert_api_common(res)
